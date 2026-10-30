@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: 'Release tag to attach platform builds to (e.g. v1.1.0)'
+        description: 'Release tag to attach platform builds to (e.g. v1.1.1)'
         required: false
-        default: 'v1.1.0'
+        default: 'v1.1.1'
   push:
     tags:
       - 'v*'
@@ -101,11 +101,13 @@ jobs:
             TAG="v${VERSION}"
           fi
           if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" \
+            for f in \
               "builds/MIKA-Engine_V${VERSION}_Android.apk" \
               "builds/MIKA-Engine_V${VERSION}_Windows.zip" \
               "builds/MIKA-Engine_V${VERSION}_Linux.zip" \
               "builds/MIKA-Engine_V${VERSION}_Android.zip" \
-              "builds/MIKA-Engine_V${VERSION}_Standalone.zip" \
-              --clobber
+              "builds/MIKA-Engine_V${VERSION}_Standalone.zip"; do
+              echo "Uploading $f to $TAG..."
+              gh release upload "$TAG" "$f" --clobber
+            done
           fi

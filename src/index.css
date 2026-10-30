@@ -97,7 +97,21 @@ button {
     color: rgba(0, 229, 255, 0.32);
 }
 
-/* ✨ MIKA'S TERMINAL SETTINGS SKIN (.mika-director-panel / .splash) ✨ */
+/* ✨ MIKA'S TERMINAL SETTINGS SKIN (.mika-director-panel / .splash) — FULLSCREEN TERMINAL DECK ✨ */
+.mika-director-panel {
+    width: 100%;
+    max-width: 540px;
+    min-height: 100%;
+    margin: 0 auto;
+    background: #050308;
+    border-left: 1px solid rgba(0, 229, 255, 0.35);
+    border-right: 1px solid rgba(0, 229, 255, 0.35);
+    padding: 22px 18px 36px 18px;
+    box-shadow: 0 0 40px rgba(0, 229, 255, 0.15), inset 0 0 24px rgba(0, 229, 255, 0.04);
+    font-family: var(--font-mono);
+    color: #EBE3D6;
+    position: relative;
+}
 .mika-director-panel .list-item {
     background: rgba(0, 229, 255, 0.03);
     border: 1px solid rgba(0, 229, 255, 0.15);

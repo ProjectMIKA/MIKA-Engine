@@ -27,7 +27,12 @@ public class OverlayService extends Service {
     public static final String ACTION_STOP_OVERLAY = "com.projectmika.mikaengine.STOP_OVERLAY";
     private static final String CHANNEL_ID = "mika_overlay_channel";
     private static final int NOTIFICATION_ID = 1042;
-    private static final int COMPACT_DP = 170;
+    // Tight 92x98dp hit-box around MIKA when idle/roaming so 98%+ of the phone screen is 100% pass-through
+    private static final int COMPACT_W_DP = 92;
+    private static final int COMPACT_H_DP = 98;
+    // Medium 250x220dp box when speech bubble is showing (still leaves almost the entire phone screen clickable)
+    private static final int BUBBLE_W_DP = 250;
+    private static final int BUBBLE_H_DP = 220;
 
     private WindowManager windowManager;
     private WebView webView;
@@ -95,7 +100,7 @@ public class OverlayService extends Service {
 
         Notification notification = builder
             .setContentTitle("MIKA Engine // Avatar Overlay Active")
-            .setContentText("Tap to dismiss MIKA system overlay")
+            .setContentText("Tap notification to dismiss MIKA system overlay")
             .setSmallIcon(android.R.drawable.sym_def_app_icon)
             .setContentIntent(stopPending)
             .setOngoing(true)
@@ -110,11 +115,12 @@ public class OverlayService extends Service {
             ? WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
             : WindowManager.LayoutParams.TYPE_PHONE;
 
-        int compactPx = Math.round(COMPACT_DP * density);
+        int compactW = Math.round(COMPACT_W_DP * density);
+        int compactH = Math.round(COMPACT_H_DP * density);
 
         params = new WindowManager.LayoutParams(
-            compactPx,
-            compactPx,
+            compactW,
+            compactH,
             overlayType,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
                 | WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
@@ -122,8 +128,8 @@ public class OverlayService extends Service {
             PixelFormat.TRANSLUCENT
         );
         params.gravity = Gravity.TOP | Gravity.START;
-        params.x = Math.round(48 * density);
-        params.y = Math.round(220 * density);
+        params.x = Math.round(60 * density);
+        params.y = Math.round(260 * density);
 
         webView = new WebView(this);
         webView.setBackgroundColor(Color.TRANSPARENT);
@@ -167,37 +173,57 @@ public class OverlayService extends Service {
 
         @JavascriptInterface
         public void syncOverlay(final int xDp, final int yDp, final boolean fullScreen, final boolean needKeyboard) {
-            mainHandler.post(new Runnable() {
-                @Override
-                public void run() {
-                    if (webView == null || params == null || windowManager == null) return;
-                    try {
-                        updateScreenMetrics();
-                        int flags = WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
-                            | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN;
-                        if (!needKeyboard) {
-                            flags |= WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE;
-                        }
-
-                        if (fullScreen) {
-                            params.width = WindowManager.LayoutParams.MATCH_PARENT;
-                            params.height = WindowManager.LayoutParams.MATCH_PARENT;
-                            params.x = 0;
-                            params.y = 0;
-                        } else {
-                            int boxPx = Math.round(COMPACT_DP * density);
-                            params.width = boxPx;
-                            params.height = boxPx;
-                            params.x = Math.round(xDp * density) - (boxPx / 2);
-                            params.y = Math.round(yDp * density) - (boxPx / 2);
-                        }
-                        params.flags = flags;
-                        windowManager.updateViewLayout(webView, params);
-                    } catch (Exception ignored) {
-                    }
-                }
-            });
+            updateOverlayInternal(xDp, yDp, fullScreen ? 2 : 0, needKeyboard);
         }
+
+        @JavascriptInterface
+        public void syncOverlayMode(final int xDp, final int yDp, final int sizeMode, final boolean needKeyboard) {
+            updateOverlayInternal(xDp, yDp, sizeMode, needKeyboard);
+        }
+    }
+
+    private void updateOverlayInternal(final int xDp, final int yDp, final int sizeMode, final boolean needKeyboard) {
+        mainHandler.post(new Runnable() {
+            @Override
+            public void run() {
+                if (webView == null || params == null || windowManager == null) return;
+                try {
+                    updateScreenMetrics();
+                    int flags = WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
+                        | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN;
+                    if (!needKeyboard) {
+                        flags |= WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE;
+                    }
+
+                    if (sizeMode >= 2) {
+                        // Fullscreen interactive mode (Radial Menu, ASK, DIRECTOR_SETTINGS, Drag)
+                        params.width = WindowManager.LayoutParams.MATCH_PARENT;
+                        params.height = WindowManager.LayoutParams.MATCH_PARENT;
+                        params.x = 0;
+                        params.y = 0;
+                    } else if (sizeMode == 1) {
+                        // Medium bubble box centered on MIKA
+                        int boxW = Math.round(BUBBLE_W_DP * density);
+                        int boxH = Math.round(BUBBLE_H_DP * density);
+                        params.width = boxW;
+                        params.height = boxH;
+                        params.x = Math.round(xDp * density) - (boxW / 2);
+                        params.y = Math.round(yDp * density) - (boxH / 2);
+                    } else {
+                        // Tight 92x98dp avatar hit-box around MIKA so all surrounding screen area is clickable
+                        int boxW = Math.round(COMPACT_W_DP * density);
+                        int boxH = Math.round(COMPACT_H_DP * density);
+                        params.width = boxW;
+                        params.height = boxH;
+                        params.x = Math.round(xDp * density) - (boxW / 2);
+                        params.y = Math.round(yDp * density) - (boxH / 2);
+                    }
+                    params.flags = flags;
+                    windowManager.updateViewLayout(webView, params);
+                } catch (Exception ignored) {
+                }
+            }
+        });
     }
 
     @Override

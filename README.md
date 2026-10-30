@@ -1,6 +1,6 @@
 # 🐾 MIKA Engine // Standalone Always-On-Top Cyber-Familiar Overlay
 
-**MIKA Engine** (`v1.1.0`) is a standalone, cross-platform **always-on-top avatar overlay** for **Windows**, **Linux**, and **Android** powered by local or cloud Large Language Models. Built with the **Project M.I.K.A. Terminal & Holographic Design Language** (`#050308` obsidian terminal panels, `#00E5FF` / `#FF107A` / `#39FF14` neon holography, and CRT scanlines), MIKA floats directly on top of your screen, roams in 8 directions, can be dragged and thrown anywhere, pilots her retro RGB starfighter, opens holographic hacker terminals, and links to any Local, Cloud, or Custom OpenAI-compatible LLM.
+**MIKA Engine** (`v1.1.1`) is a standalone, cross-platform **always-on-top avatar overlay** for **Windows**, **Linux**, and **Android** powered by local or cloud Large Language Models. Built with the **Project M.I.K.A. Terminal & Holographic Design Language** (`#050308` obsidian terminal panels, `#00E5FF` / `#FF107A` / `#39FF14` neon holography, and CRT scanlines), MIKA floats directly on top of your screen, roams in 8 directions, can be dragged and thrown anywhere, pilots her retro RGB starfighter, opens holographic hacker terminals, and links to any Local, Cloud, or Custom OpenAI-compatible LLM.
 
 ---
 
@@ -28,11 +28,11 @@ Download the ready-to-run package for your platform from the [**GitHub Releases*
 
 | Platform | Release Asset | How to Run |
 | :--- | :--- | :--- |
-| **Windows (x64)** | `MIKA-Engine_V1.1.0_Windows.zip` | Extract and double-click `MIKA-Engine.exe` — MIKA immediately spawns as a transparent always-on-top desktop overlay. |
-| **Linux (x64)** | `MIKA-Engine_V1.1.0_Linux.zip` | Extract and run `./MIKA-Engine` — MIKA spawns as a transparent always-on-top desktop overlay. |
-| **Android (APK)** | `MIKA-Engine_V1.1.0_Android.apk` | Install the signed `.apk` on Android 7.0+, grant **"Display over other apps"**, and MIKA will float over your phone screen. |
-| **Android (Source/PWA)** | `MIKA-Engine_V1.1.0_Android.zip` | Standalone Android WebView/Capacitor source package & PWA bundle. |
-| **Standalone / Web** | `MIKA-Engine_V1.1.0_Standalone.zip` | Universal zero-dependency single-file `index.html` bundle. |
+| **Windows (x64)** | `MIKA-Engine_V1.1.1_Windows.zip` | Extract and double-click `MIKA-Engine.exe` — MIKA immediately spawns as a transparent always-on-top desktop overlay. |
+| **Linux (x64)** | `MIKA-Engine_V1.1.1_Linux.zip` | Extract and run `./MIKA-Engine` — MIKA spawns as a transparent always-on-top desktop overlay. |
+| **Android (APK)** | `MIKA-Engine_V1.1.1_Android.apk` | Install the signed `.apk` on Android 7.0+, grant **"Display over other apps"**, and MIKA will float over your phone screen. |
+| **Android (Source/PWA)** | `MIKA-Engine_V1.1.1_Android.zip` | Standalone Android WebView/Capacitor source package & PWA bundle. |
+| **Standalone / Web** | `MIKA-Engine_V1.1.1_Standalone.zip` | Universal zero-dependency single-file `index.html` bundle. |
 
 ---
 
@@ -59,6 +59,10 @@ npm run build
 ---
 
 ## 📜 Release Changelog
+
+### v1.1.1 — Full-Screen Settings Deck & Android Overlay Warp Fix
+- **Full-Screen `> DIRECTOR_SETTINGS` Terminal Deck**: Made `MikaSettingsModal` a dedicated full-screen terminal view with explicit `[X] EXIT` and `> BACK_TO_OVERLAY` buttons and removed backdrop tap-to-close so touch interactions on Android never accidentally close the menu.
+- **Android Overlay Coordinate Warp Fix**: Kept speech bubbles inside the compact `240dp × 240dp` floating overlay window instead of resizing the Android `WindowManager` layout mid-tap, and increased mobile touch-slop thresholds so tapping MIKA never warps her across the screen.
 
 ### v1.1.0 — Always-On-Top Avatar Overlay & Canonical Terminal UI Overhaul
 - **Always-On-Top Transparent Avatar Overlay Across All Platforms**: Removed opaque stage backgrounds and the top floating status bar so MIKA always operates as a pure, draggable on-screen avatar overlay on Windows (`MIKA-Engine.exe`), Linux (`MIKA-Engine`), and Android (`OverlayService` with `SYSTEM_ALERT_WINDOW`).

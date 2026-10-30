@@ -172,7 +172,7 @@ const App = () => {
         if (settings.sfxEnabled !== false) playClick();
         setMemoryPopup({
             title: 'SYSTEM_AUDIT_LOG',
-            subtitle: `ENGINE_v1.1.0 // ${activeProvider.shortName.toUpperCase()}`,
+            subtitle: `ENGINE_v1.1.1 // ${activeProvider.shortName.toUpperCase()}`,
             lines: [
                 `[AVATAR_OVERLAY] ACTIVE // 100% Transparent Always-On-Top`,
                 `[NEURAL_GATEWAY] ${activeProvider.label}`,
@@ -246,7 +246,6 @@ const App = () => {
             {memoryPopup && (
                 <div
                     data-mika-interactive="true"
-                    onPointerDown={() => setMemoryPopup(null)}
                     style={{
                         position: 'fixed',
                         inset: 0,
@@ -263,7 +262,6 @@ const App = () => {
                 >
                     <div
                         data-mika-interactive="true"
-                        onPointerDown={(e) => e.stopPropagation()}
                         style={{
                             width: 'min(340px, 92vw)',
                             background: 'linear-gradient(160deg, rgba(16, 12, 28, 0.88) 0%, rgba(8, 5, 16, 0.94) 100%)',
@@ -386,7 +384,7 @@ const App = () => {
                         onShowToast={(msg, type) => setToast({ message: msg, type: type || 'info' })}
                         mikaBridgeRef={mikaRef}
                         onClose={() => setActiveModal(null)}
-                        appVersion="1.1.0"
+                        appVersion="1.1.1"
                     />
                 </div>
             )}

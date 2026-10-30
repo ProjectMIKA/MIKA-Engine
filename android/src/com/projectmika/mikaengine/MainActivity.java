@@ -80,7 +80,12 @@ public class MainActivity extends Activity {
         } else {
             startService(svc);
         }
-        finish();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            finishAndRemoveTask();
+        } else {
+            finish();
+        }
+        overridePendingTransition(0, 0);
     }
 
     @SuppressLint({"SetJavaScriptEnabled", "AllowUniversalAccessFromFileURLs"})

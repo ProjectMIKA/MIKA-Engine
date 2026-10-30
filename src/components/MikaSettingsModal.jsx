@@ -282,28 +282,29 @@ export const MikaSettingsModal = ({
     return (
         <div
             data-mika-interactive="true"
-            onPointerDown={onClose}
+            className="mika-scroll"
             style={{
                 position: 'fixed',
                 inset: 0,
                 zIndex: 9800,
-                background: 'rgba(5, 3, 8, 0.58)',
-                backdropFilter: 'blur(6px)',
-                WebkitBackdropFilter: 'blur(6px)',
+                background: '#050308',
+                overflowY: 'auto',
+                WebkitOverflowScrolling: 'touch',
                 display: 'flex',
+                flexDirection: 'column',
                 alignItems: 'center',
-                justifyContent: 'center',
-                padding: '14px',
-                animation: 'fadeIn 0.2s ease-out',
+                justifyContent: 'flex-start',
+                padding: '0',
+                animation: 'fadeIn 0.18s ease-out',
+                pointerEvents: 'auto',
             }}
         >
             <div
                 data-mika-interactive="true"
-                className="mika-director-panel swipe-scanlines mika-scroll"
-                onPointerDown={(e) => e.stopPropagation()}
+                className="mika-director-panel swipe-scanlines"
             >
                 {/* ── GachaSwipe DIRECTOR_SETTINGS Header ── */}
-                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '4px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px', gap: '8px' }}>
                     <h2
                         style={{
                             fontSize: '18px',
@@ -316,20 +317,39 @@ export const MikaSettingsModal = ({
                     >
                         &gt; DIRECTOR_SETTINGS
                     </h2>
-                    <span
-                        style={{
-                            fontSize: '9px',
-                            fontFamily: 'monospace',
-                            color: '#39FF14',
-                            background: 'rgba(57, 255, 20, 0.1)',
-                            border: '1px solid rgba(57, 255, 20, 0.35)',
-                            borderRadius: '4px',
-                            padding: '2px 6px',
-                            fontWeight: 'bold',
-                        }}
-                    >
-                        v{appVersion} // OVERLAY
-                    </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span
+                            style={{
+                                fontSize: '9px',
+                                fontFamily: 'monospace',
+                                color: '#39FF14',
+                                background: 'rgba(57, 255, 20, 0.1)',
+                                border: '1px solid rgba(57, 255, 20, 0.35)',
+                                borderRadius: '4px',
+                                padding: '3px 6px',
+                                fontWeight: 'bold',
+                            }}
+                        >
+                            v{appVersion} // OVERLAY
+                        </span>
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            style={{
+                                background: 'rgba(255, 16, 122, 0.15)',
+                                border: '1px solid #FF107A',
+                                color: '#FF107A',
+                                borderRadius: '4px',
+                                padding: '4px 10px',
+                                fontSize: '11px',
+                                fontFamily: 'monospace',
+                                fontWeight: 'bold',
+                                cursor: 'pointer',
+                            }}
+                        >
+                            [X] EXIT
+                        </button>
+                    </div>
                 </div>
                 <p
                     style={{

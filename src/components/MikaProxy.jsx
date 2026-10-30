@@ -2774,6 +2774,7 @@ const MikaProxy = ({
         const cur = posRef.current;
         const px = Number.isFinite(e.screenX) ? e.screenX : e.clientX;
         const py = Number.isFinite(e.screenY) ? e.screenY : e.clientY;
+        const hasAndroid = typeof window !== 'undefined' && Boolean(window.mikaAndroid?.syncOverlay);
         pointerRef.current = {
             startX: px,
             startY: py,
@@ -2781,6 +2782,8 @@ const MikaProxy = ({
             lastY: py,
             grabOffsetX: cur.x - px,
             grabOffsetY: cur.y - py,
+            dragThreshold: hasAndroid ? 12 : 4,
+            tapThreshold: hasAndroid ? 14 : 6,
             t: performance.now(),
             moved: 0,
             dragging: false,
@@ -2789,7 +2792,7 @@ const MikaProxy = ({
 
         pointerRef.current.petTimer = setTimeout(() => {
             const p = pointerRef.current;
-            if (!p || p.dragging || p.moved > 5) return;
+            if (!p || p.dragging || p.moved > p.tapThreshold) return;
             if (petLockedRef.current) {
                 say(mikaQuip('sated', {}, Date.now()), 'cyan');
                 return;
@@ -2828,7 +2831,7 @@ const MikaProxy = ({
         p.moved = Math.max(p.moved, distFromStart);
 
         // Immediate 1:1 drag activation with zero delay
-        if (!p.dragging && distFromStart > 4) {
+        if (!p.dragging && distFromStart > p.dragThreshold) {
             if (p.petTimer) { clearTimeout(p.petTimer); p.petTimer = null; }
             p.dragging = true;
             menuOpenRef.current = false;
@@ -2871,7 +2874,7 @@ const MikaProxy = ({
             return;
         }
 
-        if (p && p.moved <= 5) {
+        if (p && p.moved <= (p.tapThreshold || 6)) {
             const nextOpen = !menuOpenRef.current;
             menuOpenRef.current = nextOpen;
             setMenuOpen(nextOpen);
@@ -2895,12 +2898,24 @@ const MikaProxy = ({
             });
         } catch (e) {}
         try {
-            window.mikaAndroid?.syncOverlay?.(
-                Math.round(pos.x),
-                Math.round(pos.y),
-                Boolean(menuOpen || askOpen || externalModalOpen || matrixGameActive || mode === 'drag' || bubble || holoWindow || shipPhase),
-                Boolean(askOpen || externalModalOpen)
-            );
+            const isFullScreen = Boolean(menuOpen || askOpen || externalModalOpen || matrixGameActive || mode === 'drag');
+            const isBubbleActive = Boolean(bubble || holoWindow || shipPhase);
+            const sizeMode = isFullScreen ? 2 : (isBubbleActive ? 1 : 0);
+            if (window.mikaAndroid?.syncOverlayMode) {
+                window.mikaAndroid.syncOverlayMode(
+                    Math.round(pos.x),
+                    Math.round(pos.y),
+                    sizeMode,
+                    Boolean(askOpen || externalModalOpen)
+                );
+            } else {
+                window.mikaAndroid?.syncOverlay?.(
+                    Math.round(pos.x),
+                    Math.round(pos.y),
+                    isFullScreen,
+                    Boolean(askOpen || externalModalOpen)
+                );
+            }
         } catch (e) {}
     }, [pos.x, pos.y, menuOpen, askOpen, externalModalOpen, matrixGameActive, mode, bubble, holoWindow, shipPhase]);
 
@@ -3035,17 +3050,27 @@ const MikaProxy = ({
     const compiledRects = COMPILED_FRAMES[frame] || COMPILED_FRAMES.idle_0;
     const activeBubbleTone = bubble ? (TONE_PALETTE[bubble.tone] || TONE_PALETTE.green) : TONE_PALETTE.green;
 
-    const isAndroidFullScreen = Boolean(menuOpen || askOpen || externalModalOpen || matrixGameActive || mode === 'drag' || bubble || holoWindow || shipPhase);
+    const isAndroidFullScreen = Boolean(menuOpen || askOpen || externalModalOpen || matrixGameActive || mode === 'drag');
+    const isAndroidBubbleMode = Boolean(!isAndroidFullScreen && (bubble || holoWindow || shipPhase));
     const hasAndroidOverlay = typeof window !== 'undefined' && Boolean(window.mikaAndroid?.syncOverlay);
-    const renderCenterX = hasAndroidOverlay && !isAndroidFullScreen ? (window.innerWidth || 160) / 2 : pos.x;
-    const renderCenterY = hasAndroidOverlay && !isAndroidFullScreen ? (window.innerHeight || 160) / 2 : pos.y;
+    const renderCenterX = hasAndroidOverlay && !isAndroidFullScreen
+        ? (isAndroidBubbleMode ? 125 : 46)
+        : pos.x;
+    const renderCenterY = hasAndroidOverlay && !isAndroidFullScreen
+        ? (isAndroidBubbleMode ? 110 : 49)
+        : pos.y;
+
+    let bubLocalLeft = Math.round(bubBx - (pos.x - CHIBI_W / 2));
+    if (hasAndroidOverlay && !isAndroidFullScreen) {
+        bubLocalLeft = Math.round((CHIBI_W - 216) / 2);
+    }
 
     return (
         <>
             {menuOpen && (
                 <div
                     onPointerDown={() => { menuOpenRef.current = false; setMenuOpen(false); }}
-                    style={{ position: 'fixed', inset: 0, zIndex: 9399, background: 'transparent' }}
+                    style={{ position: 'fixed', inset: 0, zIndex: 9399, background: 'transparent', pointerEvents: 'auto' }}
                 />
             )}
             <div
@@ -3068,11 +3093,11 @@ const MikaProxy = ({
                         className="mika-proxy-bubble"
                         style={{
                             position: 'absolute',
-                            left: Math.round(bubBx - (pos.x - CHIBI_W / 2)),
+                            left: bubLocalLeft,
                             ...(placeBubbleAbove
-                                ? { bottom: Math.round(CHIBI_H - safeTopLocalY + 12), top: 'auto' }
-                                : { top: Math.round(safeBottomLocalY + 12), bottom: 'auto' }),
-                            transition: shipPhase ? 'none' : 'left 0.18s cubic-bezier(0.22, 1, 0.36, 1)',
+                                ? { bottom: Math.round(CHIBI_H - safeTopLocalY + 8), top: 'auto' }
+                                : { top: Math.round(safeBottomLocalY + 8), bottom: 'auto' }),
+                            transition: (shipPhase || hasAndroidOverlay) ? 'none' : 'left 0.18s cubic-bezier(0.22, 1, 0.36, 1)',
                             pointerEvents: 'none',
                             background: 'linear-gradient(180deg, rgba(6, 12, 18, 0.34) 0%, rgba(4, 8, 14, 0.44) 100%)',
                             backdropFilter: 'blur(6px) saturate(1.25)',
@@ -3084,7 +3109,7 @@ const MikaProxy = ({
                             color: activeBubbleTone.base,
                             fontSize: '10.5px',
                             lineHeight: 1.48,
-                            maxWidth: '234px',
+                            maxWidth: hasAndroidOverlay && !isAndroidFullScreen ? '216px' : '234px',
                             minWidth: '132px',
                             width: 'max-content',
                             boxShadow: `0 6px 20px rgba(0, 0, 0, 0.45), 0 0 14px ${activeBubbleTone.border}28, inset 0 0 12px ${activeBubbleTone.border}12`,
@@ -3534,7 +3559,6 @@ const MikaProxy = ({
             {askOpen && (
                 <div
                     data-mika-interactive="true"
-                    onPointerDown={() => { closeAsk(); }}
                     style={{
                         position: 'fixed',
                         inset: 0,
@@ -3551,7 +3575,6 @@ const MikaProxy = ({
                     <div
                         data-mika-interactive="true"
                         className={`mika-sanct-panel ${askOut ? 'out' : ''}`}
-                        onPointerDown={(ev) => ev.stopPropagation()}
                         style={{
                             position: 'relative',
                             width: askChatMode ? 'min(360px, 94vw)' : 'min(290px, 92vw)',
