@@ -1,12 +1,12 @@
-name: Build Standalone Android APK & Release Assets
+name: Build Standalone Android APK & Native Desktop Overlay Packages
 
 on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: 'Release tag to attach APK to (e.g. v1.0.0)'
+        description: 'Release tag to attach platform builds to (e.g. v1.1.0)'
         required: false
-        default: 'v1.0.0'
+        default: 'v1.1.0'
   push:
     tags:
       - 'v*'
@@ -15,7 +15,7 @@ permissions:
   contents: write
 
 jobs:
-  build-apk:
+  build-release-assets:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout MIKA Engine
@@ -38,18 +38,58 @@ jobs:
           npm test
           npm run build
 
-      - name: Compile & Sign Standalone Android APK
+      - name: Compile & Sign Standalone Android Overlay APK
         run: |
           chmod +x android/build-apk.sh
           ./android/build-apk.sh
 
-      - name: Upload APK Artifact
+      - name: Package Native Windows & Linux Always-On-Top Electron Overlays
+        run: |
+          VERSION="$(node -p "require('./package.json').version")"
+          npm install --no-save electron @electron/packager
+          # Temporarily omit "type": "module" so Electron loads electron/main.cjs cleanly in packaged app
+          node -e '
+            const fs = require("fs");
+            const p = JSON.parse(fs.readFileSync("package.json", "utf8"));
+            delete p.type;
+            fs.writeFileSync("package.json", JSON.stringify(p, null, 2));
+          '
+          npx @electron/packager . MIKA-Engine \
+            --platform=win32 \
+            --arch=x64 \
+            --out=builds/native \
+            --overwrite \
+            --ignore="^/(src|tests|android|builds|\\.git|\\.github|node_modules)"
+          npx @electron/packager . MIKA-Engine \
+            --platform=linux \
+            --arch=x64 \
+            --out=builds/native \
+            --overwrite \
+            --ignore="^/(src|tests|android|builds|\\.git|\\.github|node_modules)"
+          git checkout -- package.json
+
+          (
+            cd builds/native/MIKA-Engine-win32-x64
+            zip -q -r "../../MIKA-Engine_V${VERSION}_Windows.zip" .
+          )
+          (
+            cd builds/native/MIKA-Engine-linux-x64
+            zip -q -r "../../MIKA-Engine_V${VERSION}_Linux.zip" .
+          )
+          ls -lh builds/MIKA-Engine_V${VERSION}_*.zip builds/MIKA-Engine_V${VERSION}_Android.apk
+
+      - name: Upload Release Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: MIKA-Engine-Android-APK
-          path: builds/MIKA-Engine_V*_Android.apk
+          name: MIKA-Engine-Platform-Builds
+          path: |
+            builds/MIKA-Engine_V*_Android.apk
+            builds/MIKA-Engine_V*_Windows.zip
+            builds/MIKA-Engine_V*_Linux.zip
+            builds/MIKA-Engine_V*_Android.zip
+            builds/MIKA-Engine_V*_Standalone.zip
 
-      - name: Attach Standalone Android APK to GitHub Release
+      - name: Attach All Platform Builds to GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -58,7 +98,12 @@ jobs:
           if [ -z "$TAG" ]; then
             TAG="v${VERSION}"
           fi
-          APK_FILE="builds/MIKA-Engine_V${VERSION}_Android.apk"
           if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" "${APK_FILE}#MIKA-Engine_V${VERSION}_Android.apk (Standalone Android APK)" --clobber
+            gh release upload "$TAG" \
+              "builds/MIKA-Engine_V${VERSION}_Android.apk" \
+              "builds/MIKA-Engine_V${VERSION}_Windows.zip" \
+              "builds/MIKA-Engine_V${VERSION}_Linux.zip" \
+              "builds/MIKA-Engine_V${VERSION}_Android.zip" \
+              "builds/MIKA-Engine_V${VERSION}_Standalone.zip" \
+              --clobber
           fi

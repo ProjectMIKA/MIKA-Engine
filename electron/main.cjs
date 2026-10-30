@@ -6,6 +6,14 @@ app.commandLine.appendSwitch('enable-transparent-visuals');
 
 let mainWindow = null;
 let tray = null;
+let cursorPollInterval = null;
+let liveMikaBounds = {
+    x: 240,
+    y: 420,
+    radius: 95,
+    modalOpen: false,
+};
+let lastIgnoreState = null;
 
 // 16x16 Cyberpunk Neon Cyan/Pink Cat-Ear Tray Icon (Data URL PNG fallback via SVG)
 const TRAY_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
@@ -21,7 +29,7 @@ function createTray() {
             `data:image/svg+xml;base64,${Buffer.from(TRAY_SVG).toString('base64')}`
         );
         tray = new Tray(icon);
-        tray.setToolTip('MIKA Engine // Autonomous Cyber-Familiar');
+        tray.setToolTip('MIKA Engine // Always-On-Top Avatar Overlay');
         const contextMenu = Menu.buildFromTemplate([
             {
                 label: '⚡ Ask MIKA',
@@ -38,14 +46,7 @@ function createTray() {
                 },
             },
             {
-                label: '◈ Toggle Overlay / Cyber-Stage',
-                click: () => {
-                    mainWindow?.show();
-                    mainWindow?.webContents.send('mika:command', 'toggle-stage');
-                },
-            },
-            {
-                label: '⚙ Neural Uplink Settings',
+                label: '⚙ Director Settings (LLM Uplink)',
                 click: () => {
                     mainWindow?.show();
                     mainWindow?.webContents.send('mika:command', 'open-settings');
@@ -65,20 +66,49 @@ function createTray() {
     }
 }
 
+function startCursorHitTestLoop() {
+    if (cursorPollInterval) clearInterval(cursorPollInterval);
+    cursorPollInterval = setInterval(() => {
+        if (!mainWindow || mainWindow.isDestroyed()) return;
+        try {
+            if (liveMikaBounds.modalOpen) {
+                if (lastIgnoreState !== false) {
+                    lastIgnoreState = false;
+                    mainWindow.setIgnoreMouseEvents(false);
+                }
+                return;
+            }
+            const cursor = screen.getCursorScreenPoint();
+            const winBounds = mainWindow.getBounds();
+            const localX = cursor.x - winBounds.x;
+            const localY = cursor.y - winBounds.y;
+            const dist = Math.hypot(localX - liveMikaBounds.x, localY - liveMikaBounds.y);
+            const insideMika = dist <= (liveMikaBounds.radius || 95);
+            const shouldIgnore = !insideMika;
+            if (shouldIgnore !== lastIgnoreState) {
+                lastIgnoreState = shouldIgnore;
+                mainWindow.setIgnoreMouseEvents(shouldIgnore, { forward: true });
+            }
+        } catch {
+            // ignore transient display query errors
+        }
+    }, 33);
+}
+
 function createWindow() {
     const primaryDisplay = screen.getPrimaryDisplay();
-    const { width, height } = primaryDisplay.workAreaSize;
+    const { x, y, width, height } = primaryDisplay.workArea;
 
     mainWindow = new BrowserWindow({
         width,
         height,
-        x: 0,
-        y: 0,
+        x,
+        y,
         transparent: true,
         frame: false,
         alwaysOnTop: true,
         hasShadow: false,
-        resizable: true,
+        resizable: false,
         skipTaskbar: false,
         backgroundColor: '#00000000',
         webPreferences: {
@@ -88,7 +118,12 @@ function createWindow() {
         },
     });
 
-    mainWindow.setAlwaysOnTop(true, 'screen-saver');
+    try {
+        mainWindow.setAlwaysOnTop(true, 'screen-saver');
+        mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+    } catch {
+        // ignore WM-specific unsupported flags
+    }
 
     const devUrl = process.env.MIKA_DEV_URL;
     if (devUrl) {
@@ -97,15 +132,36 @@ function createWindow() {
         mainWindow.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
     }
 
+    startCursorHitTestLoop();
+
     mainWindow.on('closed', () => {
+        if (cursorPollInterval) {
+            clearInterval(cursorPollInterval);
+            cursorPollInterval = null;
+        }
         mainWindow = null;
     });
 }
+
+// IPC: Live MIKA Avatar Bounds for 30fps OS Cursor Click-Through Hit-Testing
+ipcMain.on('mika:update-bounds', (_event, bounds) => {
+    if (!bounds || typeof bounds !== 'object') return;
+    liveMikaBounds = {
+        x: Number(bounds.x) || 240,
+        y: Number(bounds.y) || 420,
+        radius: Number(bounds.radius) || 95,
+        modalOpen: Boolean(bounds.modalOpen),
+    };
+});
 
 // IPC: Desktop Overlay Click-Through Hit-Testing
 ipcMain.on('mika:set-ignore-mouse-events', (_event, ignore, options) => {
     if (!mainWindow || mainWindow.isDestroyed()) return;
     try {
+        if (liveMikaBounds.modalOpen) {
+            mainWindow.setIgnoreMouseEvents(false);
+            return;
+        }
         mainWindow.setIgnoreMouseEvents(Boolean(ignore), options || { forward: true });
     } catch {
         // ignore
@@ -122,16 +178,12 @@ ipcMain.on('mika:set-always-on-top', (_event, flag) => {
     }
 });
 
-// IPC: Stage Mode Toggle
-ipcMain.on('mika:set-stage-mode', (_event, mode) => {
+// IPC: Stage Mode (Always Overlay)
+ipcMain.on('mika:set-stage-mode', () => {
     if (!mainWindow || mainWindow.isDestroyed()) return;
     try {
-        if (mode === 'overlay') {
-            const { width, height } = screen.getPrimaryDisplay().workAreaSize;
-            mainWindow.setBounds({ x: 0, y: 0, width, height });
-        } else {
-            mainWindow.setIgnoreMouseEvents(false);
-        }
+        const { x, y, width, height } = screen.getPrimaryDisplay().workArea;
+        mainWindow.setBounds({ x, y, width, height });
     } catch {
         // ignore
     }

@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.projectmika.mikaengine"
-    android:versionCode="1"
-    android:versionName="1.0.0">
+    android:versionCode="2"
+    android:versionName="1.1.0">
 
     <uses-sdk
         android:minSdkVersion="24"
@@ -10,6 +10,9 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
 
     <application
         android:label="@string/app_name"
@@ -17,11 +20,12 @@
         android:usesCleartextTraffic="true"
         android:hardwareAccelerated="true"
         android:allowBackup="true"
-        android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
+        android:theme="@android:style/Theme.Translucent.NoTitleBar">
 
         <activity
             android:name=".MainActivity"
             android:exported="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
             android:configChanges="orientation|screenSize|smallestScreenSize|keyboard|keyboardHidden"
             android:windowSoftInputMode="adjustResize"
             android:launchMode="singleTask">
@@ -30,5 +34,15 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <service
+            android:name=".OverlayService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Always-on-top MIKA chibi avatar overlay" />
+        </service>
     </application>
 </manifest>

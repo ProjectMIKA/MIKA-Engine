@@ -12,18 +12,19 @@ const MSG_LOG_STORAGE_KEY = 'mika_engine_msg_log_v1';
 const loadSavedSettings = () => {
     try {
         const raw = localStorage.getItem(SETTINGS_STORAGE_KEY);
-        if (!raw) return { ...DEFAULT_LLM_SETTINGS };
+        if (!raw) return { ...DEFAULT_LLM_SETTINGS, stageMode: 'overlay' };
         const parsed = JSON.parse(raw);
         return {
             ...DEFAULT_LLM_SETTINGS,
             ...parsed,
+            stageMode: 'overlay',
             providerConfigs: {
                 ...DEFAULT_LLM_SETTINGS.providerConfigs,
                 ...(parsed.providerConfigs || {}),
             },
         };
     } catch {
-        return { ...DEFAULT_LLM_SETTINGS };
+        return { ...DEFAULT_LLM_SETTINGS, stageMode: 'overlay' };
     }
 };
 
@@ -41,14 +42,13 @@ const loadSavedMsgLog = () => {
 const App = () => {
     const [settings, setSettings] = useState(loadSavedSettings);
     const [msgLog, setMsgLog] = useState(loadSavedMsgLog);
-    const [activeModal, setActiveModal] = useState(null); // 'settings' | 'msgs' | 'dossier' | null
+    const [activeModal, setActiveModal] = useState(null); // 'settings' | null
+    const [memoryPopup, setMemoryPopup] = useState(null); // GachaSwipe openMemoryPopup: { title, subtitle, lines }
     const [toast, setToast] = useState(null);
-    const [hudCollapsed, setHudCollapsed] = useState(false);
     const mikaRef = useRef({});
 
     const activeProvider = getProviderPreset(settings.provider);
     const activeModel = settings.model || activeProvider.defaultModel || 'local-quips';
-    const isOverlay = settings.stageMode === 'overlay';
 
     // Save settings to localStorage & sync desktop Electron window state
     useEffect(() => {
@@ -57,14 +57,14 @@ const App = () => {
         } catch {
             // ignore storage quota errors
         }
-        document.documentElement.classList.toggle('mika-overlay-mode', isOverlay);
-        document.body.classList.toggle('mika-overlay-mode', isOverlay);
+        document.documentElement.classList.add('mika-overlay-mode');
+        document.body.classList.add('mika-overlay-mode');
 
         if (typeof window !== 'undefined' && window.mikaDesktop) {
-            window.mikaDesktop.setStageMode?.(settings.stageMode);
-            window.mikaDesktop.setAlwaysOnTop?.(Boolean(settings.alwaysOnTop));
+            window.mikaDesktop.setStageMode?.('overlay');
+            window.mikaDesktop.setAlwaysOnTop?.(settings.alwaysOnTop !== false);
         }
-    }, [settings, isOverlay]);
+    }, [settings]);
 
     // Save message log
     useEffect(() => {
@@ -75,11 +75,11 @@ const App = () => {
         }
     }, [msgLog]);
 
-    // Electron Desktop Overlay Click-Through Hit-Testing
+    // Electron Desktop Overlay Click-Through Hit-Testing (renderer fallback alongside main-process cursor poll)
     useEffect(() => {
         if (typeof window === 'undefined' || !window.mikaDesktop?.setIgnoreMouseEvents) return undefined;
 
-        if (!isOverlay || activeModal) {
+        if (activeModal || memoryPopup) {
             window.mikaDesktop.setIgnoreMouseEvents(false);
             return undefined;
         }
@@ -104,7 +104,7 @@ const App = () => {
             window.removeEventListener('pointermove', onPointerMove);
             window.mikaDesktop.setIgnoreMouseEvents(false);
         };
-    }, [isOverlay, activeModal]);
+    }, [activeModal, memoryPopup]);
 
     // Listen for system tray / IPC commands from Electron main process
     useEffect(() => {
@@ -112,12 +112,7 @@ const App = () => {
         return window.mikaDesktop.onCommand((cmd) => {
             if (cmd === 'open-settings') setActiveModal('settings');
             else if (cmd === 'open-ask') mikaRef.current?.ask?.();
-            else if (cmd === 'toggle-stage') {
-                setSettings((prev) => ({
-                    ...prev,
-                    stageMode: prev.stageMode === 'overlay' ? 'stage' : 'overlay',
-                }));
-            } else if (cmd === 'summon-center') {
+            else if (cmd === 'summon-center') {
                 mikaRef.current?.dropFromCeiling?.();
             }
         });
@@ -128,7 +123,7 @@ const App = () => {
         if (!settings.llmAmbient || !settings.roamEnabled) return undefined;
         const intervalSec = settings.roamCadence === 'chatty' ? 30 : settings.roamCadence === 'quiet' ? 75 : 48;
         const timer = setInterval(async () => {
-            if (document.hidden || activeModal) return;
+            if (document.hidden || activeModal || memoryPopup) return;
             try {
                 const res = await askMikaLlm({
                     config: settings,
@@ -142,7 +137,7 @@ const App = () => {
             }
         }, intervalSec * 1000);
         return () => clearInterval(timer);
-    }, [settings, activeModal]);
+    }, [settings, activeModal, memoryPopup]);
 
     const appendLogEntry = useCallback((entryOrText) => {
         const payload = typeof entryOrText === 'string'
@@ -163,6 +158,7 @@ const App = () => {
         setSettings((prev) => ({
             ...prev,
             ...partial,
+            stageMode: 'overlay',
         }));
     }, []);
 
@@ -172,17 +168,47 @@ const App = () => {
         mikaRef.current?.say?.(line, { tone: 'warn', ms: 5200 });
     };
 
-    const toggleStageMode = () => {
+    const handleOpenLogs = () => {
         if (settings.sfxEnabled !== false) playClick();
-        setSettings((prev) => {
-            const nextMode = prev.stageMode === 'overlay' ? 'stage' : 'overlay';
-            setToast({
-                message: nextMode === 'overlay'
-                    ? 'OVERLAY_MODE // TRANSPARENT_DESKTOP_ROAM_ACTIVE'
-                    : 'STAGE_MODE // CYBER_SANCTUARY_DECK_ACTIVE',
-                type: 'info',
-            });
-            return { ...prev, stageMode: nextMode };
+        setMemoryPopup({
+            title: 'SYSTEM_AUDIT_LOG',
+            subtitle: `ENGINE_v1.1.0 // ${activeProvider.shortName.toUpperCase()}`,
+            lines: [
+                `[AVATAR_OVERLAY] ACTIVE // 100% Transparent Always-On-Top`,
+                `[NEURAL_GATEWAY] ${activeProvider.label}`,
+                `[TARGET_MODEL_ID] ${activeModel}`,
+                `[CHASSIS_ENGINE] ${(settings.avatarStyle || 'vector_pixel').toUpperCase()} (${settings.scale || 1}x)`,
+                `[ROAM_AUTONOMY] ${settings.roamEnabled !== false ? 'ENABLED' : 'LOCKED'} // CADENCE: ${(settings.roamCadence || 'balanced').toUpperCase()}`,
+            ],
+        });
+    };
+
+    const handleOpenMsgs = () => {
+        if (settings.sfxEnabled !== false) playClick();
+        const recent = [...msgLog].slice(-8).reverse();
+        setMemoryPopup({
+            title: 'TTY_MESSAGE_BUFFER',
+            subtitle: `${msgLog.length} PACKETS RECORDED`,
+            lines: recent.length > 0
+                ? recent.map((m) => `[${m.ts} // ${m.category || 'TTY'}] ${m.text}`)
+                : [
+                    '[BUFFER_EMPTY] No recent transmissions recorded yet.',
+                    'Tap ASK on MIKA\'s radial ring to open the neural relay terminal.',
+                ],
+        });
+    };
+
+    const handleOpenDossier = () => {
+        if (settings.sfxEnabled !== false) playClick();
+        setMemoryPopup({
+            title: 'FAMILIAR_DOSSIER',
+            subtitle: `DESIGNATION: M.I.K.A. // USER: ${(settings.userTitle || 'Master').toUpperCase()}`,
+            lines: [
+                'CLASS: Autonomous Cyber-Catgirl Avatar Overlay Familiar',
+                'DOCTRINE: Mouthless Silent Chibi — all emotion expressed via eyes & physics',
+                'CAPABILITIES: 8-Way Roaming, Wall-Scratching, Cat-Loaf Naps, RGB Starfighter, Hacker TTY',
+                `ACTIVE UPLINK: ${activeProvider.shortName} -> ${activeModel}`,
+            ],
         });
     };
 
@@ -192,455 +218,175 @@ const App = () => {
                 position: 'fixed',
                 inset: 0,
                 overflow: 'hidden',
-                background: isOverlay
-                    ? 'transparent'
-                    : 'radial-gradient(circle at 50% 28%, rgba(26, 15, 46, 0.85) 0%, rgba(11, 9, 20, 0.96) 55%, #050308 100%)',
-                pointerEvents: isOverlay ? 'none' : 'auto',
+                background: 'transparent',
+                pointerEvents: 'none',
                 userSelect: 'none',
             }}
         >
-            {/* ── CYBER-STAGE ATMOSPHERE LAYER (Hidden in Transparent Overlay Mode) ── */}
-            {!isOverlay && (
-                <>
-                    <div className="swipe-scanlines" />
-                    <div className="swipe-scanline-move" />
-                    <div className="swipe-vignette" />
-
-                    {/* Perspective Cyber Grid Floor & Telemetry Watermark */}
-                    <div
-                        style={{
-                            position: 'absolute',
-                            inset: 0,
-                            pointerEvents: 'none',
-                            backgroundImage: `
-                                linear-gradient(rgba(0, 229, 255, 0.045) 1px, transparent 1px),
-                                linear-gradient(90deg, rgba(0, 229, 255, 0.045) 1px, transparent 1px)
-                            `,
-                            backgroundSize: '42px 42px',
-                            maskImage: 'radial-gradient(circle at 50% 50%, black 30%, transparent 85%)',
-                            WebkitMaskImage: 'radial-gradient(circle at 50% 50%, black 30%, transparent 85%)',
-                        }}
-                    />
-
-                    {/* Center Stage Ambient Telemetry Badge */}
-                    <div
-                        style={{
-                            position: 'absolute',
-                            left: '50%',
-                            top: '50%',
-                            transform: 'translate(-50%, -50%)',
-                            pointerEvents: 'none',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'center',
-                            gap: '8px',
-                            opacity: 0.22,
-                        }}
-                    >
-                        <div
-                            style={{
-                                width: '240px',
-                                height: '240px',
-                                borderRadius: '50%',
-                                border: '1px dashed rgba(0, 229, 255, 0.45)',
-                                boxShadow: '0 0 60px rgba(0, 229, 255, 0.12), inset 0 0 40px rgba(255, 16, 122, 0.08)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                            }}
-                        >
-                            <div
-                                style={{
-                                    width: '168px',
-                                    height: '168px',
-                                    borderRadius: '50%',
-                                    border: '1px solid rgba(255, 16, 122, 0.35)',
-                                }}
-                            />
-                        </div>
-                        <div style={{ fontSize: '10px', fontWeight: 900, letterSpacing: '0.24em', color: '#00E5FF' }}>
-                            MIKA_ENGINE // AUTONOMOUS_CHIBI_STAGE
-                        </div>
-                        <div style={{ fontSize: '8.5px', letterSpacing: '0.14em', color: 'rgba(255,255,255,0.55)' }}>
-                            TAP_CHIBI_FOR_RADIAL_HUD • DRAG_TO_THROW • SETTINGS_FOR_LLM_UPLINK
-                        </div>
-                    </div>
-                </>
-            )}
-
-            {/* ── TOP FLOATING COMMAND PILL (Interactive in both Stage & Overlay modes) ── */}
-            <div
-                data-mika-interactive="true"
-                style={{
-                    position: 'fixed',
-                    top: '12px',
-                    left: '50%',
-                    transform: 'translateX(-50%)',
-                    zIndex: 9500,
-                    pointerEvents: 'auto',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    padding: hudCollapsed ? '5px 10px' : '6px 12px',
-                    borderRadius: '999px',
-                    background: 'rgba(8, 6, 16, 0.84)',
-                    backdropFilter: 'blur(14px) saturate(1.4)',
-                    WebkitBackdropFilter: 'blur(14px) saturate(1.4)',
-                    border: '1px solid rgba(0, 229, 255, 0.35)',
-                    boxShadow: '0 8px 28px rgba(0, 0, 0, 0.65), 0 0 16px rgba(0, 229, 255, 0.14)',
-                    fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace",
-                    maxWidth: '96vw',
-                    flexWrap: 'wrap',
-                    justifyContent: 'center',
-                }}
-            >
-                <button
-                    onClick={() => {
-                        if (settings.sfxEnabled !== false) playClick();
-                        setHudCollapsed((v) => !v);
-                    }}
-                    style={{
-                        background: 'none',
-                        border: 'none',
-                        color: '#00E5FF',
-                        fontSize: '10px',
-                        fontWeight: 900,
-                        letterSpacing: '0.12em',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        padding: '2px 4px',
-                        fontFamily: 'inherit',
-                    }}
-                    title="Collapse or expand MIKA Engine status bar"
-                >
-                    <span style={{ color: '#39FF14', textShadow: '0 0 8px #39FF14' }}>●</span>
-                    <span>▸ MIKA_ENGINE</span>
-                    <span style={{ fontSize: '8.5px', color: 'rgba(255,255,255,0.45)' }}>v1.0.0</span>
-                </button>
-
-                {!hudCollapsed && (
-                    <>
-                        <span style={{ color: 'rgba(255,255,255,0.18)', fontSize: '10px' }}>|</span>
-
-                        {/* Active Provider Pill */}
-                        <button
-                            onClick={() => {
-                                if (settings.sfxEnabled !== false) playClick();
-                                setActiveModal('settings');
-                            }}
-                            style={{
-                                background: 'rgba(0, 229, 255, 0.08)',
-                                border: '1px solid rgba(0, 229, 255, 0.28)',
-                                borderRadius: '999px',
-                                padding: '2px 8px',
-                                fontSize: '8.5px',
-                                fontWeight: 800,
-                                color: '#EBE3D6',
-                                letterSpacing: '0.06em',
-                                cursor: 'pointer',
-                                fontFamily: 'inherit',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '5px',
-                            }}
-                            title="Configure LLM Provider & API Endpoint"
-                        >
-                            <span style={{ color: '#00E5FF' }}>{activeProvider.shortName}</span>
-                            <span style={{ color: 'rgba(255,255,255,0.45)' }}>/</span>
-                            <span style={{ color: '#39FF14', maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                {activeModel}
-                            </span>
-                        </button>
-
-                        {/* Stage vs Overlay Mode Toggle */}
-                        <button
-                            onClick={toggleStageMode}
-                            style={{
-                                background: isOverlay ? 'rgba(57, 255, 20, 0.14)' : 'rgba(181, 51, 255, 0.14)',
-                                border: `1px solid ${isOverlay ? 'rgba(57, 255, 20, 0.45)' : 'rgba(181, 51, 255, 0.45)'}`,
-                                borderRadius: '6px',
-                                padding: '3px 7px',
-                                fontSize: '8.5px',
-                                fontWeight: 900,
-                                color: isOverlay ? '#39FF14' : '#E0AAFF',
-                                letterSpacing: '0.08em',
-                                cursor: 'pointer',
-                                fontFamily: 'inherit',
-                            }}
-                            title="Toggle between Transparent Desktop Overlay and Cyber-Stage Window"
-                        >
-                            {isOverlay ? '◈ OVERLAY' : '▣ STAGE'}
-                        </button>
-
-                        {/* Quick ASK Button */}
-                        <button
-                            onClick={() => {
-                                if (settings.sfxEnabled !== false) playClick();
-                                mikaRef.current?.ask?.();
-                            }}
-                            style={{
-                                background: 'rgba(57, 255, 20, 0.12)',
-                                border: '1px solid rgba(57, 255, 20, 0.45)',
-                                borderRadius: '6px',
-                                padding: '3px 7px',
-                                fontSize: '8.5px',
-                                fontWeight: 900,
-                                color: '#39FF14',
-                                letterSpacing: '0.08em',
-                                cursor: 'pointer',
-                                fontFamily: 'inherit',
-                            }}
-                        >
-                            ⚡ ASK
-                        </button>
-
-                        {/* Quick SETTINGS Button */}
-                        <button
-                            onClick={() => {
-                                if (settings.sfxEnabled !== false) playClick();
-                                setActiveModal('settings');
-                            }}
-                            style={{
-                                background: 'rgba(0, 229, 255, 0.14)',
-                                border: '1px solid rgba(0, 229, 255, 0.5)',
-                                borderRadius: '6px',
-                                padding: '3px 8px',
-                                fontSize: '8.5px',
-                                fontWeight: 900,
-                                color: '#00E5FF',
-                                letterSpacing: '0.08em',
-                                cursor: 'pointer',
-                                fontFamily: 'inherit',
-                            }}
-                        >
-                            ⚙ SETTINGS
-                        </button>
-                    </>
-                )}
-            </div>
-
-            {/* ── THE AUTONOMOUS MIKA CHIBI PROXY ── */}
+            {/* ── THE AUTONOMOUS MIKA CHIBI PROXY (100% Transparent Always-On-Top Overlay) ── */}
             <MikaProxy
                 mikaBridgeRef={mikaRef}
                 settings={settings}
                 avatarStyle={settings.avatarStyle || 'vector_pixel'}
                 scale={Number(settings.scale) || 1}
                 roamEnabled={settings.roamEnabled !== false}
+                externalModalOpen={Boolean(activeModal || memoryPopup)}
                 onPoke={handlePoke}
+                onOpenLogs={handleOpenLogs}
+                onOpenMsgs={handleOpenMsgs}
+                onOpenDossier={handleOpenDossier}
                 onOpenSettings={() => {
                     if (settings.sfxEnabled !== false) playClick();
                     setActiveModal('settings');
                 }}
-                onOpenMsgs={() => {
-                    if (settings.sfxEnabled !== false) playClick();
-                    setActiveModal('msgs');
-                }}
-                onOpenDossier={() => {
-                    if (settings.sfxEnabled !== false) playClick();
-                    setActiveModal('dossier');
-                }}
                 onLogMessage={appendLogEntry}
             />
 
-            {/* ── MESSAGE LOG MODAL (MSGS RADIAL NODE) ── */}
-            {activeModal === 'msgs' && (
+            {/* ── EXACT GACHASWIPE NEURAL_DATA_EXTRACTED POPUP (LOGS / MSGS / DOSSIER) ── */}
+            {memoryPopup && (
                 <div
                     data-mika-interactive="true"
-                    className="modal-overlay"
-                    onClick={() => setActiveModal(null)}
+                    onPointerDown={() => setMemoryPopup(null)}
+                    style={{
+                        position: 'fixed',
+                        inset: 0,
+                        zIndex: 9900,
+                        background: 'rgba(5, 3, 8, 0.45)',
+                        backdropFilter: 'blur(4px)',
+                        WebkitBackdropFilter: 'blur(4px)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: '16px',
+                        pointerEvents: 'auto',
+                    }}
                 >
                     <div
-                        className="modal-content cyber-border"
-                        onClick={(e) => e.stopPropagation()}
-                        style={{ maxWidth: '540px', maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}
+                        data-mika-interactive="true"
+                        onPointerDown={(e) => e.stopPropagation()}
+                        style={{
+                            width: 'min(340px, 92vw)',
+                            background: 'linear-gradient(160deg, rgba(16, 12, 28, 0.88) 0%, rgba(8, 5, 16, 0.94) 100%)',
+                            backdropFilter: 'blur(18px) saturate(150%)',
+                            WebkitBackdropFilter: 'blur(18px) saturate(150%)',
+                            border: '1px solid rgba(0, 229, 255, 0.45)',
+                            borderTop: '1px solid rgba(255, 255, 255, 0.35)',
+                            borderRadius: '14px',
+                            padding: '18px 16px 14px 16px',
+                            boxShadow: '0 20px 50px rgba(0, 0, 0, 0.85), 0 0 28px rgba(0, 229, 255, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.2)',
+                            color: '#fff',
+                            fontFamily: 'monospace',
+                            animation: 'memoryPopupFade 0.28s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+                        }}
                     >
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', paddingBottom: '10px', borderBottom: '1px solid rgba(255, 213, 79, 0.3)' }}>
-                            <div>
-                                <div style={{ fontSize: '12px', fontWeight: 900, letterSpacing: '0.14em', color: '#FFD54F', textShadow: '0 0 10px rgba(255, 213, 79, 0.35)' }}>
-                                    ▸ MIKA_PROXY // MESSAGE_ARCHIVE_TTY
-                                </div>
-                                <div style={{ fontSize: '9.5px', color: 'rgba(255,255,255,0.5)', marginTop: '2px' }}>
-                                    Recent speech bubbles, user prompts, and neural uplink transmissions ({msgLog.length} packets)
-                                </div>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px', borderBottom: '1px solid rgba(0, 229, 255, 0.2)', paddingBottom: '6px' }}>
+                            <span style={{ fontSize: '10px', color: '#00E5FF', fontWeight: 'bold', letterSpacing: '0.12em' }}>
+                                &gt; NEURAL_DATA_EXTRACTED
+                            </span>
+                            <span style={{ fontSize: '10px', color: '#FF107A', fontWeight: 'bold' }}>[MEM_OK]</span>
+                        </div>
+
+                        <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#FFD54F', marginBottom: '2px', letterSpacing: '0.04em' }}>
+                            {memoryPopup.title}
+                        </div>
+                        {memoryPopup.subtitle && (
+                            <div style={{ fontSize: '10px', color: 'rgba(0, 229, 255, 0.75)', marginBottom: '10px' }}>
+                                // {memoryPopup.subtitle}
                             </div>
-                            <div style={{ display: 'flex', gap: '6px' }}>
-                                {msgLog.length > 0 && (
-                                    <button
-                                        className="deck-btn"
-                                        style={{ padding: '4px 8px', fontSize: '9px' }}
-                                        onClick={() => setMsgLog([])}
-                                    >
-                                        CLEAR_LOG
-                                    </button>
-                                )}
-                                <button
-                                    onClick={() => setActiveModal(null)}
+                        )}
+
+                        <div
+                            className="mika-scroll"
+                            style={{
+                                maxHeight: '220px',
+                                overflowY: 'auto',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '6px',
+                                marginBottom: '14px',
+                            }}
+                        >
+                            {(memoryPopup.lines || []).map((line, idx) => (
+                                <div
+                                    key={idx}
                                     style={{
-                                        background: 'rgba(255, 16, 122, 0.14)',
-                                        border: '1px solid rgba(255, 16, 122, 0.45)',
-                                        borderRadius: '6px',
-                                        color: '#FF107A',
-                                        fontWeight: 900,
                                         fontSize: '11px',
-                                        padding: '4px 10px',
-                                        cursor: 'pointer',
-                                        fontFamily: 'inherit',
+                                        color: 'rgba(255, 255, 255, 0.92)',
+                                        lineHeight: '1.45',
+                                        padding: '7px 9px',
+                                        background: 'rgba(0, 229, 255, 0.04)',
+                                        border: '1px solid rgba(0, 229, 255, 0.16)',
+                                        borderLeft: '2.5px solid #00E5FF',
+                                        borderRadius: '4px',
+                                        wordBreak: 'break-word',
                                     }}
                                 >
-                                    ✕ ESC
+                                    {line}
+                                </div>
+                            ))}
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                            {memoryPopup.title === 'TTY_MESSAGE_BUFFER' && msgLog.length > 0 && (
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setMsgLog([]);
+                                        setMemoryPopup(null);
+                                        setToast({ message: '[ TTY_BUFFER_PURGED ]', type: 'info' });
+                                    }}
+                                    style={{
+                                        flex: 1,
+                                        padding: '8px',
+                                        background: 'rgba(255, 16, 122, 0.12)',
+                                        border: '1px solid rgba(255, 16, 122, 0.45)',
+                                        borderRadius: '8px',
+                                        color: '#FF107A',
+                                        fontFamily: 'monospace',
+                                        fontSize: '10px',
+                                        fontWeight: 'bold',
+                                        cursor: 'pointer',
+                                        letterSpacing: '0.08em',
+                                    }}
+                                >
+                                    [PURGE_LOG]
                                 </button>
-                            </div>
-                        </div>
-
-                        <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px', paddingRight: '4px' }}>
-                            {msgLog.length === 0 ? (
-                                <div style={{ padding: '32px 16px', textAlign: 'center', color: 'rgba(255,255,255,0.4)', fontSize: '10.5px', border: '1px dashed rgba(255,255,255,0.12)', borderRadius: '8px' }}>
-                                    [ NO_TTY_PACKETS_RECORDED_YET // POKE_OR_ASK_MIKA ]
-                                </div>
-                            ) : (
-                                [...msgLog].reverse().map((entry) => (
-                                    <div
-                                        key={entry.id}
-                                        style={{
-                                            padding: '8px 10px',
-                                            borderRadius: '6px',
-                                            background: 'rgba(10, 14, 22, 0.78)',
-                                            border: '1px solid rgba(0, 229, 255, 0.2)',
-                                            borderLeft: `3px solid ${entry.category === 'ASK' ? '#39FF14' : entry.category === 'BITE' ? '#FF3355' : '#00E5FF'}`,
-                                            fontSize: '10.5px',
-                                            lineHeight: 1.5,
-                                        }}
-                                    >
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '8.5px', fontWeight: 800, color: 'rgba(255,255,255,0.5)', marginBottom: '4px', letterSpacing: '0.08em' }}>
-                                            <span style={{ color: '#00E5FF' }}>[{entry.category || 'TTY'}]</span>
-                                            <span>{entry.ts}</span>
-                                        </div>
-                                        <div style={{ color: '#EBE3D6' }}>{entry.text}</div>
-                                    </div>
-                                ))
                             )}
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* ── SYSTEM DOSSIER MODAL (DOSSIER RADIAL NODE) ── */}
-            {activeModal === 'dossier' && (
-                <div
-                    data-mika-interactive="true"
-                    className="modal-overlay"
-                    onClick={() => setActiveModal(null)}
-                >
-                    <div
-                        className="modal-content cyber-border"
-                        onClick={(e) => e.stopPropagation()}
-                        style={{ maxWidth: '520px' }}
-                    >
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', paddingBottom: '10px', borderBottom: '1px solid rgba(181, 51, 255, 0.35)' }}>
-                            <div>
-                                <div style={{ fontSize: '12px', fontWeight: 900, letterSpacing: '0.14em', color: '#E0AAFF', textShadow: '0 0 10px rgba(181, 51, 255, 0.45)' }}>
-                                    ▸ MIKA_ENGINE // FAMILIAR_DOSSIER_v1.0.0
-                                </div>
-                                <div style={{ fontSize: '9.5px', color: 'rgba(255,255,255,0.5)', marginTop: '2px' }}>
-                                    Autonomous Cyber-Familiar Telemetry & Direct Action Overrides
-                                </div>
-                            </div>
                             <button
-                                onClick={() => setActiveModal(null)}
+                                type="button"
+                                onClick={() => setMemoryPopup(null)}
                                 style={{
-                                    background: 'rgba(255, 16, 122, 0.14)',
-                                    border: '1px solid rgba(255, 16, 122, 0.45)',
-                                    borderRadius: '6px',
-                                    color: '#FF107A',
-                                    fontWeight: 900,
+                                    flex: 2,
+                                    padding: '8px',
+                                    background: 'rgba(0, 229, 255, 0.14)',
+                                    border: '1px solid rgba(0, 229, 255, 0.45)',
+                                    borderRadius: '8px',
+                                    color: '#00E5FF',
+                                    fontFamily: 'monospace',
                                     fontSize: '11px',
-                                    padding: '4px 10px',
+                                    fontWeight: 'bold',
                                     cursor: 'pointer',
-                                    fontFamily: 'inherit',
+                                    letterSpacing: '0.1em',
                                 }}
                             >
-                                ✕ ESC
-                            </button>
-                        </div>
-
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '8px', marginBottom: '14px' }}>
-                            <div className="setting-row" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '3px' }}>
-                                <span style={{ fontSize: '8.5px', color: 'rgba(255,255,255,0.45)', fontWeight: 800 }}>DESIGNATION</span>
-                                <span style={{ fontSize: '11px', color: '#00E5FF', fontWeight: 900 }}>MIKA // CHIBI_PROXY</span>
-                            </div>
-                            <div className="setting-row" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '3px' }}>
-                                <span style={{ fontSize: '8.5px', color: 'rgba(255,255,255,0.45)', fontWeight: 800 }}>ACTIVE_UPLINK</span>
-                                <span style={{ fontSize: '11px', color: '#39FF14', fontWeight: 900 }}>{activeProvider.shortName}</span>
-                            </div>
-                            <div className="setting-row" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '3px' }}>
-                                <span style={{ fontSize: '8.5px', color: 'rgba(255,255,255,0.45)', fontWeight: 800 }}>CHASSIS_RENDERER</span>
-                                <span style={{ fontSize: '11px', color: '#FF107A', fontWeight: 900 }}>
-                                    {settings.avatarStyle === 'retro_pixel' ? '24x24 RETRO_PIXEL' : 'VECTOR_RGB_NEON'}
-                                </span>
-                            </div>
-                            <div className="setting-row" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '3px' }}>
-                                <span style={{ fontSize: '8.5px', color: 'rgba(255,255,255,0.45)', fontWeight: 800 }}>STAGE_TOPOLOGY</span>
-                                <span style={{ fontSize: '11px', color: '#FFD54F', fontWeight: 900 }}>
-                                    {isOverlay ? 'TRANSPARENT_OVERLAY' : 'CYBER_STAGE_WINDOW'}
-                                </span>
-                            </div>
-                        </div>
-
-                        <div style={{ fontSize: '10px', fontWeight: 900, color: '#00E5FF', letterSpacing: '0.1em', marginBottom: '8px' }}>
-                            ▸ DIRECT_CHASSIS_OVERRIDES
-                        </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '8px', marginBottom: '12px' }}>
-                            <button
-                                className="deck-btn"
-                                onClick={() => {
-                                    setActiveModal(null);
-                                    mikaRef.current?.pilotSpaceship?.();
-                                }}
-                            >
-                                🚀 LAUNCH_STARFIGHTER
-                            </button>
-                            <button
-                                className="deck-btn"
-                                onClick={() => {
-                                    setActiveModal(null);
-                                    mikaRef.current?.openHackerTerminal?.();
-                                }}
-                            >
-                                💻 HOLO_HACKER_TTY
-                            </button>
-                            <button
-                                className="deck-btn"
-                                onClick={() => {
-                                    setActiveModal(null);
-                                    mikaRef.current?.dropFromCeiling?.();
-                                }}
-                            >
-                                ☄ CEILING_DROP
-                            </button>
-                            <button
-                                className="deck-btn"
-                                onClick={() => {
-                                    setActiveModal('settings');
-                                }}
-                            >
-                                ⚙ NEURAL_SETTINGS
+                                [ACKNOWLEDGE]
                             </button>
                         </div>
                     </div>
                 </div>
             )}
 
-            {/* ── SETTINGS MODAL (SETTINGS RADIAL NODE) ── */}
+            {/* ── DIRECTOR_SETTINGS MODAL (SETTINGS RADIAL NODE) ── */}
             {activeModal === 'settings' && (
-                <div data-mika-interactive="true">
+                <div data-mika-interactive="true" style={{ pointerEvents: 'auto' }}>
                     <MikaSettingsModal
                         settings={settings}
                         onUpdateSettings={handleUpdateSettings}
                         onSay={(text, opts) => mikaRef.current?.say?.(text, opts)}
                         onShowToast={(msg, type) => setToast({ message: msg, type: type || 'info' })}
+                        mikaBridgeRef={mikaRef}
                         onClose={() => setActiveModal(null)}
+                        appVersion="1.1.0"
                     />
                 </div>
             )}

@@ -2,6 +2,9 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('mikaDesktop', {
     platform: process.platform,
+    updateMikaBounds: (bounds) => {
+        ipcRenderer.send('mika:update-bounds', bounds);
+    },
     setIgnoreMouseEvents: (ignore, options) => {
         ipcRenderer.send('mika:set-ignore-mouse-events', Boolean(ignore), options || { forward: true });
     },

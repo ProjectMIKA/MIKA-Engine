@@ -3,7 +3,7 @@ import React, { useState, useRef, useEffect } from 'react';
 /**
  * ✨ CYBER_DROPDOWN ✨
  * Futuristic in-app custom select menu replacing native browser/OS dropdowns.
- * Canonical MIKA Visual Language control.
+ * Canonical GachaSwipe MIKA Visual Language control (.bubble-tab + .bubble-content + .dropdown-option).
  */
 export const CyberDropdown = ({
     label,
@@ -50,7 +50,7 @@ export const CyberDropdown = ({
                         color: accentColor,
                         fontWeight: 'bold',
                         marginBottom: '4px',
-                        fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace",
+                        fontFamily: 'monospace',
                         letterSpacing: '0.05em',
                         textTransform: 'uppercase',
                     }}
@@ -61,6 +61,7 @@ export const CyberDropdown = ({
 
             <button
                 type="button"
+                className="bubble-tab"
                 onClick={() => setIsOpen((prev) => !prev)}
                 style={{
                     width: '100%',
@@ -70,7 +71,7 @@ export const CyberDropdown = ({
                     color: value ? '#E0E7FF' : 'rgba(255, 255, 255, 0.4)',
                     padding: '8px 12px',
                     fontSize: '11px',
-                    fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace",
+                    fontFamily: 'monospace',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
@@ -78,6 +79,7 @@ export const CyberDropdown = ({
                     boxShadow: isOpen ? `0 0 12px ${accentColor}40` : 'none',
                     transition: 'all 0.2s ease',
                     textAlign: 'left',
+                    marginBottom: 0,
                 }}
             >
                 <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginRight: '8px' }}>
@@ -102,7 +104,7 @@ export const CyberDropdown = ({
 
             {isOpen && (
                 <div
-                    className="mika-scroll"
+                    className="bubble-content mika-scroll"
                     style={{
                         position: 'absolute',
                         top: 'calc(100% + 4px)',
@@ -118,6 +120,8 @@ export const CyberDropdown = ({
                         maxHeight: '195px',
                         overflowY: 'auto',
                         padding: '4px',
+                        marginTop: 0,
+                        marginBottom: 0,
                     }}
                 >
                     {options.map((opt) => {
@@ -128,14 +132,15 @@ export const CyberDropdown = ({
                         return (
                             <div
                                 key={optValue}
+                                className="dropdown-option"
                                 onClick={() => handleSelect(optValue)}
                                 style={{
                                     padding: '8px 10px',
                                     borderRadius: '4px',
                                     fontSize: '11px',
-                                    fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace",
+                                    fontFamily: 'monospace',
                                     color: isSelected ? accentColor : '#E0E7FF',
-                                    background: isSelected ? `${accentColor}18` : 'transparent',
+                                    background: isSelected ? `${accentColor}15` : 'transparent',
                                     cursor: 'pointer',
                                     display: 'flex',
                                     alignItems: 'center',

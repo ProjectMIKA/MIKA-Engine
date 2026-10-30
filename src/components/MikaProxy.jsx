@@ -1297,9 +1297,22 @@ function resolveOctant(vx, vy) {
     return { dirKey: 'ne', flipX: 1 };
 }
 
+const getScreenSize = () => {
+    if (typeof window !== 'undefined') {
+        try {
+            if (window.mikaAndroid?.getScreenWidth && window.mikaAndroid?.getScreenHeight) {
+                const aw = Number(window.mikaAndroid.getScreenWidth());
+                const ah = Number(window.mikaAndroid.getScreenHeight());
+                if (aw > 100 && ah > 100) return { W: aw, H: ah };
+            }
+        } catch (e) {}
+        return { W: window.innerWidth || 400, H: window.innerHeight || 700 };
+    }
+    return { W: 400, H: 700 };
+};
+
 const clampPos = (x, y) => {
-    const W = typeof window !== 'undefined' ? window.innerWidth : 400;
-    const H = typeof window !== 'undefined' ? window.innerHeight : 700;
+    const { W, H } = getScreenSize();
     return {
         x: Math.max(EDGE_MARGIN, Math.min(x, W - EDGE_MARGIN)),
         y: Math.max(EDGE_MARGIN + 10, Math.min(y, H - EDGE_MARGIN)),
@@ -1936,6 +1949,7 @@ const MikaProxy = ({
     settings = {},
     onPoke,
     onOpenSettings,
+    onOpenLogs,
     onOpenMsgs,
     onOpenDossier,
     onLogMessage,
@@ -1945,6 +1959,7 @@ const MikaProxy = ({
     scale = 1,
     roamEnabled = true,
     matrixGameActive = false,
+    externalModalOpen = false,
     mikaBridgeRef = null,
 }) => {
     const [pos, setPos] = useState(() => clampPos(
@@ -2368,8 +2383,7 @@ const MikaProxy = ({
 
     // ── Pick a new 2D walk target on the screen ──
     const pickNewTarget = () => {
-        const W = window.innerWidth;
-        const H = window.innerHeight;
+        const { W, H } = getScreenSize();
         const cur = posRef.current;
         const roll = Math.random();
         let tx, ty, wallEdge = null;
@@ -2758,13 +2772,15 @@ const MikaProxy = ({
         e.stopPropagation();
         e.currentTarget.setPointerCapture?.(e.pointerId);
         const cur = posRef.current;
+        const px = Number.isFinite(e.screenX) ? e.screenX : e.clientX;
+        const py = Number.isFinite(e.screenY) ? e.screenY : e.clientY;
         pointerRef.current = {
-            startX: e.clientX,
-            startY: e.clientY,
-            lastX: e.clientX,
-            lastY: e.clientY,
-            grabOffsetX: cur.x - e.clientX,
-            grabOffsetY: cur.y - e.clientY,
+            startX: px,
+            startY: py,
+            lastX: px,
+            lastY: py,
+            grabOffsetX: cur.x - px,
+            grabOffsetY: cur.y - py,
             t: performance.now(),
             moved: 0,
             dragging: false,
@@ -2788,12 +2804,14 @@ const MikaProxy = ({
     const onPointerMove = (e) => {
         const p = pointerRef.current;
         if (!p) return;
-        const dxFromStart = e.clientX - p.startX;
-        const dyFromStart = e.clientY - p.startY;
-        const stepDx = e.clientX - p.lastX;
-        const stepDy = e.clientY - p.lastY;
-        p.lastX = e.clientX;
-        p.lastY = e.clientY;
+        const px = Number.isFinite(e.screenX) ? e.screenX : e.clientX;
+        const py = Number.isFinite(e.screenY) ? e.screenY : e.clientY;
+        const dxFromStart = px - p.startX;
+        const dyFromStart = py - p.startY;
+        const stepDx = px - p.lastX;
+        const stepDy = py - p.lastY;
+        p.lastX = px;
+        p.lastY = py;
 
         if (modeRef.current === 'pet' && petRef.current) {
             const rubDelta = Math.abs(stepDx) + Math.abs(stepDy);
@@ -2822,7 +2840,7 @@ const MikaProxy = ({
         }
 
         if (p.dragging) {
-            const next = clampPos(e.clientX + p.grabOffsetX, e.clientY + p.grabOffsetY);
+            const next = clampPos(px + p.grabOffsetX, py + p.grabOffsetY);
             posRef.current = next;
             setPos(next);
 
@@ -2865,9 +2883,29 @@ const MikaProxy = ({
         }
     };
 
+    // ── Sync live bounds with Desktop Electron (Windows/Linux) and Android OverlayService ──
+    useEffect(() => {
+        const modalOpen = Boolean(menuOpen || askOpen || externalModalOpen || matrixGameActive || mode === 'drag');
+        try {
+            window.mikaDesktop?.updateMikaBounds?.({
+                x: Math.round(pos.x),
+                y: Math.round(pos.y),
+                radius: menuOpen ? 165 : (bubble ? 150 : 95),
+                modalOpen,
+            });
+        } catch (e) {}
+        try {
+            window.mikaAndroid?.syncOverlay?.(
+                Math.round(pos.x),
+                Math.round(pos.y),
+                Boolean(menuOpen || askOpen || externalModalOpen || matrixGameActive || mode === 'drag' || bubble || holoWindow || shipPhase),
+                Boolean(askOpen || externalModalOpen)
+            );
+        } catch (e) {}
+    }, [pos.x, pos.y, menuOpen, askOpen, externalModalOpen, matrixGameActive, mode, bubble, holoWindow, shipPhase]);
+
     // ── Radial Menu Orbital Geometry (Viewport-Safe Arc) ──
-    const W = typeof window !== 'undefined' ? window.innerWidth : 400;
-    const H = typeof window !== 'undefined' ? window.innerHeight : 700;
+    const { W, H } = getScreenSize();
 
     let baseAngleDeg = -90;
     const nearLeft = pos.x < 125;
@@ -2883,8 +2921,8 @@ const MikaProxy = ({
     else if (nearLeft) baseAngleDeg = 0;
     else if (nearRight) baseAngleDeg = 180;
 
-    const RADIAL_RADIUS = 84;
-    const ARC_SPREAD = 148;
+    const RADIAL_RADIUS = 88;
+    const ARC_SPREAD = 168;
     const radialItems = [
         {
             id: 'ask',
@@ -2907,6 +2945,13 @@ const MikaProxy = ({
             locked: petLocked,
             closeOnClick: false,
             onClick: () => { triggerPetAction(); },
+        },
+        {
+            id: 'logs',
+            label: 'LOGS',
+            color: '#00E5FF',
+            closeOnClick: true,
+            onClick: () => { onOpenLogs?.(); },
         },
         {
             id: 'msgs',
@@ -2990,6 +3035,11 @@ const MikaProxy = ({
     const compiledRects = COMPILED_FRAMES[frame] || COMPILED_FRAMES.idle_0;
     const activeBubbleTone = bubble ? (TONE_PALETTE[bubble.tone] || TONE_PALETTE.green) : TONE_PALETTE.green;
 
+    const isAndroidFullScreen = Boolean(menuOpen || askOpen || externalModalOpen || matrixGameActive || mode === 'drag' || bubble || holoWindow || shipPhase);
+    const hasAndroidOverlay = typeof window !== 'undefined' && Boolean(window.mikaAndroid?.syncOverlay);
+    const renderCenterX = hasAndroidOverlay && !isAndroidFullScreen ? (window.innerWidth || 160) / 2 : pos.x;
+    const renderCenterY = hasAndroidOverlay && !isAndroidFullScreen ? (window.innerHeight || 160) / 2 : pos.y;
+
     return (
         <>
             {menuOpen && (
@@ -3005,7 +3055,7 @@ const MikaProxy = ({
                     top: 0,
                     width: CHIBI_W,
                     height: CHIBI_H,
-                    transform: `translate3d(${Math.round(pos.x - CHIBI_W / 2)}px, ${Math.round(pos.y - CHIBI_H / 2)}px, 0)`,
+                    transform: `translate3d(${Math.round(renderCenterX - CHIBI_W / 2)}px, ${Math.round(renderCenterY - CHIBI_H / 2)}px, 0)`,
                     transition: 'none',
                     willChange: 'transform',
                     zIndex: matrixGameActive ? 10065 : 9400,

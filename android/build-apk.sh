@@ -36,11 +36,11 @@ echo "[MIKA_APK] 1/6 Compiling Android resources via aapt2..."
     -I "$PLATFORM_JAR" \
     --manifest android/AndroidManifest.xml \
     --java "$WORK_DIR/gen" \
-    --version-code 1 \
+    --version-code 2 \
     --version-name "$VERSION" \
     "$WORK_DIR/res.zip"
 
-echo "[MIKA_APK] 2/6 Compiling MainActivity.java..."
+echo "[MIKA_APK] 2/6 Compiling MainActivity.java & OverlayService.java..."
 find "$WORK_DIR/gen" android/src -name "*.java" > "$WORK_DIR/sources.txt"
 javac --release 11 \
     -cp "$PLATFORM_JAR" \

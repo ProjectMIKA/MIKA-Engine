@@ -272,7 +272,7 @@ export const DEFAULT_LLM_SETTINGS = {
     providerConfigs: {},
     avatarStyle: 'vector_pixel',
     scale: 1,
-    stageMode: 'stage',
+    stageMode: 'overlay',
     alwaysOnTop: true,
     roamEnabled: true,
     roamCadence: 'balanced',
