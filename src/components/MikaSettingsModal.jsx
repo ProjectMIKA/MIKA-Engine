@@ -20,7 +20,6 @@ const BUILTIN_PRESETS = {
     '★ M.I.K.A.': {
         avatarStyle: 'vector_pixel',
         scale: 1,
-        alwaysOnTop: true,
         roamEnabled: true,
         roamCadence: 'balanced',
         llmAmbient: false,
@@ -68,9 +67,9 @@ export const MikaSettingsModal = ({
     onSay,
     onShowToast,
     mikaBridgeRef = null,
-    appVersion = '1.1.0',
+    appVersion = '1.1.2',
 }) => {
-    const [settingsTab, setSettingsTab] = useState('core'); // 'core' | 'uplink' | 'voice'
+    const [settingsTab, setSettingsTab] = useState('engine'); // 'engine' | 'uplink'
     const [hideRecommendation, setHideRecommendation] = useState(false);
     const [newPresetName, setNewPresetName] = useState('');
     const [providerFilter, setProviderFilter] = useState('ALL'); // 'ALL' | 'LOCAL' | 'CLOUD' | 'CUSTOM'
@@ -297,12 +296,15 @@ export const MikaSettingsModal = ({
                 padding: '0',
                 animation: 'fadeIn 0.18s ease-out',
                 pointerEvents: 'auto',
+                touchAction: 'pan-y',
             }}
         >
             <div
                 data-mika-interactive="true"
-                className="mika-director-panel swipe-scanlines"
+                className="mika-director-panel"
+                style={{ pointerEvents: 'auto' }}
             >
+                <div className="swipe-scanlines" aria-hidden="true" style={{ pointerEvents: 'none' }} />
                 {/* ── GachaSwipe DIRECTOR_SETTINGS Header ── */}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px', gap: '8px' }}>
                     <h2
@@ -360,7 +362,7 @@ export const MikaSettingsModal = ({
                         marginTop: '4px',
                     }}
                 >
-                    // Fine-tune your M.I.K.A. Proxy overlay &amp; neural uplink.
+                    // Configure your standalone M.I.K.A. Chibi Proxy &amp; neural uplink.
                 </p>
 
                 {/* ── Dismissible M.I.K.A_RECOMMENDATION Banner (Exact GachaSwipe Pattern) ── */}
@@ -422,12 +424,13 @@ export const MikaSettingsModal = ({
                     </div>
                 )}
 
-                {/* ── Sticky Settings Tab Bar (Exact GachaSwipe .settings-tab-nav & Custom SVGs) ── */}
+                {/* ── Sticky Settings Tab Bar (2 Dedicated MIKA Engine Tabs) ── */}
                 <div className="settings-tab-nav">
                     <button
                         type="button"
-                        className={`settings-tab-btn ${settingsTab === 'core' ? 'active' : ''}`}
-                        onClick={() => setSettingsTab('core')}
+                        className={`settings-tab-btn ${settingsTab === 'engine' ? 'active' : ''}`}
+                        onClick={() => setSettingsTab('engine')}
+                        style={{ flex: 1, justifyContent: 'center' }}
                     >
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                             <path d="M7 3c0 5 10 5 10 10s-10 5-10 10" />
@@ -436,13 +439,14 @@ export const MikaSettingsModal = ({
                             <line x1="12" y1="13" x2="12" y2="13.01" strokeWidth="3" />
                             <line x1="8.5" y1="18" x2="15.5" y2="18" strokeOpacity="0.6" />
                         </svg>
-                        <span>CORE MATRIX</span>
+                        <span>MIKA ENGINE</span>
                     </button>
 
                     <button
                         type="button"
                         className={`settings-tab-btn ${settingsTab === 'uplink' ? 'active' : ''}`}
                         onClick={() => setSettingsTab('uplink')}
+                        style={{ flex: 1, justifyContent: 'center' }}
                     >
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                             <path d="M19 14c1.66 0 3-1.34 3-3V6c0-1.66-1.34-3-3-3H9C7.34 3 6 4.34 6 6v1" strokeOpacity="0.6" />
@@ -452,24 +456,12 @@ export const MikaSettingsModal = ({
                         </svg>
                         <span>NEURAL UPLINK</span>
                     </button>
-
-                    <button
-                        type="button"
-                        className={`settings-tab-btn ${settingsTab === 'voice' ? 'active' : ''}`}
-                        onClick={() => setSettingsTab('voice')}
-                    >
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                            <rect x="2" y="2" width="20" height="20" rx="5" fill="currentColor" fillOpacity="0.05" />
-                            <path d="M6 12h2l2-5 4 10 2-5h2" />
-                        </svg>
-                        <span>P.U.R.R. &amp; VOICE</span>
-                    </button>
                 </div>
 
                 {/* ============================================================
-                    TAB 1: CORE MATRIX (System Presets, MIKA Engine, Chassis, Overrides)
+                    TAB 1: MIKA ENGINE (Presets, Chibi Chassis, Roaming, SFX, Overrides)
                    ============================================================ */}
-                {settingsTab === 'core' && (
+                {settingsTab === 'engine' && (
                     <div>
                         <div
                             style={{
@@ -490,7 +482,7 @@ export const MikaSettingsModal = ({
                                     &gt; CONFIGURATION_PROFILES
                                 </div>
                                 <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontFamily: 'monospace', marginTop: '2px' }}>
-                                    // Save &amp; hot-swap your entire MIKA Engine configuration
+                                    // Save &amp; hot-swap your MIKA Engine configuration
                                 </div>
                             </div>
 
@@ -599,7 +591,7 @@ export const MikaSettingsModal = ({
                                 letterSpacing: '0.1em',
                             }}
                         >
-                            &gt; MIKA_ENGINE OVERLAY MATRIX
+                            &gt; MIKA_ENGINE CHASSIS &amp; AUTONOMY
                         </div>
 
                         {/* MIKA_ENGINE Row (Exact GachaSwipe line 21319 pattern) */}
@@ -628,7 +620,7 @@ export const MikaSettingsModal = ({
                                                 border: '1px solid rgba(255, 213, 79, 0.35)',
                                             }}
                                         >
-                                            OVERLAY
+                                            ROAMING
                                         </span>
                                     </div>
                                     <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontFamily: 'monospace', marginTop: '2px' }}>
@@ -667,23 +659,33 @@ export const MikaSettingsModal = ({
                                     accentColor="#00E5FF"
                                 />
                             </div>
+
+                            <div style={{ paddingTop: '4px' }}>
+                                <CyberDropdown
+                                    label="> UNPROMPTED_ROAM_CADENCE"
+                                    value={settings.roamCadence || 'balanced'}
+                                    options={CADENCE_OPTIONS}
+                                    onChange={(val) => onUpdateSettings({ roamCadence: val })}
+                                    accentColor="#FF9100"
+                                />
+                            </div>
                         </div>
 
-                        {/* Always on top toggle */}
+                        {/* Chibi Synth SFX Toggle */}
                         <div className="list-item">
                             <div style={{ paddingRight: '12px' }}>
-                                <div style={{ fontWeight: 'bold', fontSize: '14px', fontFamily: 'monospace', color: '#E0E7FF' }}>
-                                    &gt; ALWAYS_ON_TOP_OVERLAY
+                                <div style={{ fontWeight: 'bold', fontSize: '14px', fontFamily: 'monospace', color: '#39FF14' }}>
+                                    &gt; CHIBI_SYNTH_SFX
                                 </div>
                                 <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontFamily: 'monospace', marginTop: '2px' }}>
-                                    // Keep MIKA floating above all OS windows on Windows, Linux &amp; Android
+                                    // WebAudio retro synth blips for headpats, sighs, hacker windows, and bites
                                 </div>
                             </div>
                             <label className="toggle-switch" style={{ flexShrink: 0 }}>
                                 <input
                                     type="checkbox"
-                                    checked={settings.alwaysOnTop !== false}
-                                    onChange={(e) => onUpdateSettings({ alwaysOnTop: e.target.checked })}
+                                    checked={settings.sfxEnabled !== false}
+                                    onChange={(e) => onUpdateSettings({ sfxEnabled: e.target.checked })}
                                 />
                                 <span className="slider" />
                             </label>
@@ -786,7 +788,7 @@ export const MikaSettingsModal = ({
                 )}
 
                 {/* ============================================================
-                    TAB 2: NEURAL UPLINK (Local, Cloud & Custom OpenAI Endpoints)
+                    TAB 2: NEURAL UPLINK (Local, Cloud, Custom OpenAI Endpoints & Persona)
                    ============================================================ */}
                 {settingsTab === 'uplink' && (
                     <div>
@@ -1029,7 +1031,7 @@ export const MikaSettingsModal = ({
                                 </div>
                             </div>
 
-                            {/* Verify Neural Uplink Button & OobTraceModal-style Phosphor Status Box */}
+                            {/* Verify Neural Uplink Button & Phosphor Status Box */}
                             <button
                                 type="button"
                                 onClick={handleTestUplink}
@@ -1080,25 +1082,18 @@ export const MikaSettingsModal = ({
                                 </div>
                             )}
                         </div>
-                    </div>
-                )}
 
-                {/* ============================================================
-                    TAB 3: P.U.R.R. & VOICE (Honorific, Cadence, Ambient LLM, SFX, Persona)
-                   ============================================================ */}
-                {settingsTab === 'voice' && (
-                    <div>
                         <div
                             style={{
                                 fontSize: '12px',
                                 color: '#00E5FF',
                                 fontFamily: 'monospace',
-                                marginTop: '4px',
+                                marginTop: '18px',
                                 marginBottom: '8px',
                                 letterSpacing: '0.1em',
                             }}
                         >
-                            &gt; VOICE_&amp;_AUTONOMY
+                            &gt; MIKA_PERSONA &amp; LLM_SAMPLING
                         </div>
 
                         {/* User Honorific Title */}
@@ -1122,24 +1117,6 @@ export const MikaSettingsModal = ({
                             />
                         </div>
 
-                        {/* Unprompted Roam Cadence */}
-                        <div className="list-item" style={{ flexDirection: 'column', alignItems: 'stretch', gap: '8px' }}>
-                            <div>
-                                <div style={{ fontWeight: 'bold', fontSize: '14px', fontFamily: 'monospace', color: '#E0E7FF' }}>
-                                    &gt; UNPROMPTED_ROAM_CADENCE
-                                </div>
-                                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontFamily: 'monospace', marginTop: '2px' }}>
-                                    // Frequency of MIKA&apos;s autonomous quips &amp; ambient remarks
-                                </div>
-                            </div>
-                            <CyberDropdown
-                                value={settings.roamCadence || 'balanced'}
-                                options={CADENCE_OPTIONS}
-                                onChange={(val) => onUpdateSettings({ roamCadence: val })}
-                                accentColor="#FF9100"
-                            />
-                        </div>
-
                         {/* Proactive LLM Thoughts */}
                         <div className="list-item">
                             <div style={{ paddingRight: '12px' }}>
@@ -1155,26 +1132,6 @@ export const MikaSettingsModal = ({
                                     type="checkbox"
                                     checked={Boolean(settings.llmAmbient)}
                                     onChange={(e) => onUpdateSettings({ llmAmbient: e.target.checked })}
-                                />
-                                <span className="slider" />
-                            </label>
-                        </div>
-
-                        {/* WebAudio Synth SFX */}
-                        <div className="list-item">
-                            <div style={{ paddingRight: '12px' }}>
-                                <div style={{ fontWeight: 'bold', fontSize: '14px', fontFamily: 'monospace', color: '#39FF14' }}>
-                                    &gt; WEBAUDIO_SYNTH_SFX
-                                </div>
-                                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontFamily: 'monospace', marginTop: '2px' }}>
-                                    // Procedural sound effects for headpats, sighs, hacker windows, and bites
-                                </div>
-                            </div>
-                            <label className="toggle-switch" style={{ flexShrink: 0 }}>
-                                <input
-                                    type="checkbox"
-                                    checked={settings.sfxEnabled !== false}
-                                    onChange={(e) => onUpdateSettings({ sfxEnabled: e.target.checked })}
                                 />
                                 <span className="slider" />
                             </label>

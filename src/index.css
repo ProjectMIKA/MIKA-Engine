@@ -33,6 +33,14 @@ button {
     touch-action: manipulation;
     user-select: none;
     -webkit-tap-highlight-color: transparent;
+    pointer-events: auto;
+}
+
+input, textarea {
+    user-select: text;
+    -webkit-user-select: text;
+    pointer-events: auto;
+    touch-action: manipulation;
 }
 
 /* ✨ MIKA'S GACHASWIPE CORE BUTTONS & INPUTS ✨ */
@@ -111,6 +119,7 @@ button {
     font-family: var(--font-mono);
     color: #EBE3D6;
     position: relative;
+    pointer-events: auto;
 }
 .mika-director-panel .list-item {
     background: rgba(0, 229, 255, 0.03);

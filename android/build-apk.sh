@@ -36,7 +36,7 @@ echo "[MIKA_APK] 1/6 Compiling Android resources via aapt2..."
     -I "$PLATFORM_JAR" \
     --manifest android/AndroidManifest.xml \
     --java "$WORK_DIR/gen" \
-    --version-code 3 \
+    --version-code 4 \
     --version-name "$VERSION" \
     "$WORK_DIR/res.zip"
 

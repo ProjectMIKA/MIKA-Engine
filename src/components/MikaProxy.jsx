@@ -1962,9 +1962,12 @@ const MikaProxy = ({
     externalModalOpen = false,
     mikaBridgeRef = null,
 }) => {
-    const [pos, setPos] = useState(() => clampPos(
-        (typeof window !== 'undefined' ? window.innerWidth : 400) * 0.28,
-        (typeof window !== 'undefined' ? window.innerHeight : 700) * 0.72
+    const [pos, setPos] = useState(() => {
+        const { W, H } = getScreenSize();
+        return clampPos(W * 0.28, H * 0.72);
+    });
+    const [webViewWidth, setWebViewWidth] = useState(() => (
+        typeof window !== 'undefined' ? (window.innerWidth || 400) : 400
     ));
     const [mode, setMode] = useState('stop'); // stop | move | sit | yawn | sleep | scratch | awake | drag | pet | bite | sated | sigh | hack | hop | pilot
     const [frame, setFrame] = useState('idle_0');
@@ -2224,7 +2227,7 @@ const MikaProxy = ({
                     matrixTimersRef.current.push(t1, t2);
                 },
                 dropFromCeiling: () => {
-                    const W = typeof window !== 'undefined' ? window.innerWidth : 400;
+                    const { W } = getScreenSize();
                     posRef.current = { x: W * 0.5, y: 48 };
                     velRef.current = { vx: (Math.random() - 0.5) * 180, vy: 520 };
                     setPos(posRef.current);
@@ -2276,8 +2279,7 @@ const MikaProxy = ({
         setFlipX(1);
         setDragTilt(0);
 
-        const W = typeof window !== 'undefined' ? window.innerWidth : 400;
-        const H = typeof window !== 'undefined' ? window.innerHeight : 700;
+        const { W, H } = getScreenSize();
         const stageX = Math.max(88, Math.min(W - 88, posRef.current.x < W * 0.22 || posRef.current.x > W * 0.78 ? W * 0.68 : posRef.current.x));
         const stageY = Math.max(210, Math.min(H - 170, posRef.current.y < 210 || posRef.current.y > H - 160 ? H * 0.58 : posRef.current.y));
         posRef.current = { x: stageX, y: stageY };
@@ -2373,6 +2375,9 @@ const MikaProxy = ({
 
     useEffect(() => {
         const onResize = () => {
+            if (typeof window !== 'undefined') {
+                setWebViewWidth(window.innerWidth || 400);
+            }
             const c = clampPos(posRef.current.x, posRef.current.y);
             posRef.current = c;
             setPos(c);
@@ -2460,8 +2465,7 @@ const MikaProxy = ({
                 if (shipPhaseRef.current === 'piloting') {
                     flightTimeRef.current += dt;
                     const ft = flightTimeRef.current;
-                    const W = window.innerWidth;
-                    const H = window.innerHeight;
+                    const { W, H } = getScreenSize();
                     const minX = 68;
                     const maxX = Math.max(minX + 40, W - 68);
                     const minY = 128;
@@ -2543,7 +2547,7 @@ const MikaProxy = ({
                     posRef.current = { x: tgt.x, y: tgt.y };
                     setPos(posRef.current);
 
-                    const W = window.innerWidth;
+                    const { W } = getScreenSize();
                     if (tgt.wallEdge || p.x <= EDGE_MARGIN + WALL_CHECK_DIST || p.x >= W - EDGE_MARGIN - WALL_CHECK_DIST) {
                         const wallFlip = p.x <= W / 2 ? -1 : 1;
                         octantRef.current = { dirKey: 'e', flipX: wallFlip };
@@ -2605,7 +2609,8 @@ const MikaProxy = ({
                 if (stateTimerRef.current >= nextRoamDelayRef.current) {
                     const actionRoll = Math.random();
                     const userTitle = settingsRef.current?.userTitle || 'Master';
-                    const speakChance = settingsRef.current?.ambientCadence === 'quiet' ? 0.1 : settingsRef.current?.ambientCadence === 'chatty' ? 0.55 : 0.28;
+                    const cadence = settingsRef.current?.roamCadence || settingsRef.current?.ambientCadence || 'balanced';
+                    const speakChance = cadence === 'quiet' ? 0.1 : cadence === 'chatty' ? 0.55 : 0.28;
                     if (roamEnabledRef.current !== false && actionRoll < 0.54) {
                         pickNewTarget();
                         setModeSafe('move');
@@ -2768,12 +2773,27 @@ const MikaProxy = ({
     };
 
     // ── Pointer: Zero-Lag 1:1 Drag, Hold-to-Pet, Tap for Radial Menu ──
+    const getPointerScreenPos = (e) => {
+        if (typeof window !== 'undefined' && window.mikaAndroid?.getRawTouchX && window.mikaAndroid?.getRawTouchY) {
+            try {
+                const rx = Number(window.mikaAndroid.getRawTouchX());
+                const ry = Number(window.mikaAndroid.getRawTouchY());
+                if (Number.isFinite(rx) && Number.isFinite(ry)) {
+                    return { x: rx, y: ry };
+                }
+            } catch (err) {}
+        }
+        return {
+            x: Number.isFinite(e.screenX) ? e.screenX : e.clientX,
+            y: Number.isFinite(e.screenY) ? e.screenY : e.clientY,
+        };
+    };
+
     const onPointerDown = (e) => {
         e.stopPropagation();
         e.currentTarget.setPointerCapture?.(e.pointerId);
         const cur = posRef.current;
-        const px = Number.isFinite(e.screenX) ? e.screenX : e.clientX;
-        const py = Number.isFinite(e.screenY) ? e.screenY : e.clientY;
+        const { x: px, y: py } = getPointerScreenPos(e);
         const hasAndroid = typeof window !== 'undefined' && Boolean(window.mikaAndroid?.syncOverlay);
         pointerRef.current = {
             startX: px,
@@ -2782,8 +2802,8 @@ const MikaProxy = ({
             lastY: py,
             grabOffsetX: cur.x - px,
             grabOffsetY: cur.y - py,
-            dragThreshold: hasAndroid ? 12 : 4,
-            tapThreshold: hasAndroid ? 14 : 6,
+            dragThreshold: hasAndroid ? 10 : 4,
+            tapThreshold: hasAndroid ? 12 : 6,
             t: performance.now(),
             moved: 0,
             dragging: false,
@@ -2807,8 +2827,7 @@ const MikaProxy = ({
     const onPointerMove = (e) => {
         const p = pointerRef.current;
         if (!p) return;
-        const px = Number.isFinite(e.screenX) ? e.screenX : e.clientX;
-        const py = Number.isFinite(e.screenY) ? e.screenY : e.clientY;
+        const { x: px, y: py } = getPointerScreenPos(e);
         const dxFromStart = px - p.startX;
         const dyFromStart = py - p.startY;
         const stepDx = px - p.lastX;
@@ -2839,7 +2858,10 @@ const MikaProxy = ({
             targetRef.current = null;
             velRef.current = { vx: 0, vy: 0 };
             setModeSafe('drag');
-            say(mikaQuip('dragged', {}, Date.now()), 'warn');
+            const hasAndroid = typeof window !== 'undefined' && Boolean(window.mikaAndroid?.syncOverlay);
+            if (!hasAndroid) {
+                say(mikaQuip('dragged', {}, Date.now()), 'warn');
+            }
         }
 
         if (p.dragging) {
@@ -2898,8 +2920,8 @@ const MikaProxy = ({
             });
         } catch (e) {}
         try {
-            const isFullScreen = Boolean(menuOpen || askOpen || externalModalOpen || matrixGameActive || mode === 'drag');
-            const isBubbleActive = Boolean(bubble || holoWindow || shipPhase);
+            const isFullScreen = Boolean(menuOpen || askOpen || externalModalOpen || matrixGameActive);
+            const isBubbleActive = Boolean(!isFullScreen && mode !== 'drag' && (bubble || holoWindow || shipPhase));
             const sizeMode = isFullScreen ? 2 : (isBubbleActive ? 1 : 0);
             if (window.mikaAndroid?.syncOverlayMode) {
                 window.mikaAndroid.syncOverlayMode(
@@ -3050,15 +3072,17 @@ const MikaProxy = ({
     const compiledRects = COMPILED_FRAMES[frame] || COMPILED_FRAMES.idle_0;
     const activeBubbleTone = bubble ? (TONE_PALETTE[bubble.tone] || TONE_PALETTE.green) : TONE_PALETTE.green;
 
-    const isAndroidFullScreen = Boolean(menuOpen || askOpen || externalModalOpen || matrixGameActive || mode === 'drag');
-    const isAndroidBubbleMode = Boolean(!isAndroidFullScreen && (bubble || holoWindow || shipPhase));
     const hasAndroidOverlay = typeof window !== 'undefined' && Boolean(window.mikaAndroid?.syncOverlay);
-    const renderCenterX = hasAndroidOverlay && !isAndroidFullScreen
-        ? (isAndroidBubbleMode ? 125 : 46)
-        : pos.x;
-    const renderCenterY = hasAndroidOverlay && !isAndroidFullScreen
-        ? (isAndroidBubbleMode ? 110 : 49)
-        : pos.y;
+    const liveVw = typeof window !== 'undefined' ? (window.innerWidth || webViewWidth) : webViewWidth;
+    const isAndroidCompactView = hasAndroidOverlay && liveVw <= 140;
+    const isAndroidBubbleView = hasAndroidOverlay && liveVw > 140 && liveVw <= 280;
+    const isAndroidFullScreen = !hasAndroidOverlay || liveVw > 280;
+    const renderCenterX = isAndroidCompactView
+        ? 44
+        : (isAndroidBubbleView ? 118 : pos.x);
+    const renderCenterY = isAndroidCompactView
+        ? 46
+        : (isAndroidBubbleView ? 115 : pos.y);
 
     let bubLocalLeft = Math.round(bubBx - (pos.x - CHIBI_W / 2));
     if (hasAndroidOverlay && !isAndroidFullScreen) {

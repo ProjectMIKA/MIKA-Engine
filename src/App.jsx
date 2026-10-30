@@ -4,7 +4,7 @@ import { MikaSettingsModal } from './components/MikaSettingsModal.jsx';
 import TerminalToast from './components/TerminalToast.jsx';
 import { DEFAULT_LLM_SETTINGS, getProviderPreset, askMikaLlm } from './utils/llmClient.js';
 import { pickMikaQuip } from './utils/mikaQuips.js';
-import { playClick } from './utils/mikaAudio.js';
+import { playClick, matrixAudio } from './utils/mikaAudio.js';
 
 const SETTINGS_STORAGE_KEY = 'mika_engine_settings_v1';
 const MSG_LOG_STORAGE_KEY = 'mika_engine_msg_log_v1';
@@ -59,6 +59,11 @@ const App = () => {
         }
         document.documentElement.classList.add('mika-overlay-mode');
         document.body.classList.add('mika-overlay-mode');
+        try {
+            matrixAudio?.setMuted?.(settings.sfxEnabled === false);
+        } catch {
+            // ignore
+        }
 
         if (typeof window !== 'undefined' && window.mikaDesktop) {
             window.mikaDesktop.setStageMode?.('overlay');
@@ -172,7 +177,7 @@ const App = () => {
         if (settings.sfxEnabled !== false) playClick();
         setMemoryPopup({
             title: 'SYSTEM_AUDIT_LOG',
-            subtitle: `ENGINE_v1.1.1 // ${activeProvider.shortName.toUpperCase()}`,
+            subtitle: `ENGINE_v1.1.2 // ${activeProvider.shortName.toUpperCase()}`,
             lines: [
                 `[AVATAR_OVERLAY] ACTIVE // 100% Transparent Always-On-Top`,
                 `[NEURAL_GATEWAY] ${activeProvider.label}`,
@@ -384,7 +389,7 @@ const App = () => {
                         onShowToast={(msg, type) => setToast({ message: msg, type: type || 'info' })}
                         mikaBridgeRef={mikaRef}
                         onClose={() => setActiveModal(null)}
-                        appVersion="1.1.1"
+                        appVersion="1.1.2"
                     />
                 </div>
             )}
