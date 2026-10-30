@@ -57,12 +57,14 @@ jobs:
           npx @electron/packager . MIKA-Engine \
             --platform=win32 \
             --arch=x64 \
+            --electron-version=33.2.0 \
             --out=builds/native \
             --overwrite \
             --ignore="^/(src|tests|android|builds|\\.git|\\.github|node_modules)"
           npx @electron/packager . MIKA-Engine \
             --platform=linux \
             --arch=x64 \
+            --electron-version=33.2.0 \
             --out=builds/native \
             --overwrite \
             --ignore="^/(src|tests|android|builds|\\.git|\\.github|node_modules)"
