@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 64 64">
+  <defs>
+    <radialGradient id="bgGlow" cx="50%" cy="40%" r="60%">
+      <stop offset="0%" stop-color="#1A0F2E"/>
+      <stop offset="65%" stop-color="#0B0914"/>
+      <stop offset="100%" stop-color="#050308"/>
+    </radialGradient>
+    <linearGradient id="neonRim" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00E5FF"/>
+      <stop offset="50%" stop-color="#FF107A"/>
+      <stop offset="100%" stop-color="#39FF14"/>
+    </linearGradient>
+  </defs>
+  <rect x="2" y="2" width="60" height="60" rx="14" fill="url(#bgGlow)" stroke="url(#neonRim)" stroke-width="2.5"/>
+  <!-- Cyber Cat Ears & Chibi Silhouette -->
+  <path d="M14 44 L17 14 L26 24 L38 24 L47 14 L50 44 C50 49 43 52 32 52 C21 52 14 49 14 44 Z" fill="#120E1E" stroke="#FF107A" stroke-width="2.2" stroke-linejoin="round"/>
+  <path d="M19 18 L24 24 L18 26 Z" fill="#00E5FF"/>
+  <path d="M45 18 L40 24 L46 26 Z" fill="#00E5FF"/>
+  <!-- Glowing Terminal Eyes -->
+  <rect x="21" y="32" width="6" height="7" rx="2" fill="#00E5FF"/>
+  <rect x="37" y="32" width="6" height="7" rx="2" fill="#00E5FF"/>
+  <rect x="22.5" y="33" width="2" height="2" fill="#FFFFFF"/>
+  <rect x="38.5" y="33" width="2" height="2" fill="#FFFFFF"/>
+  <!-- Cat Fang Smile -->
+  <path d="M28 43 Q30 45 32 43 Q34 45 36 43" fill="none" stroke="#39FF14" stroke-width="1.8" stroke-linecap="round"/>
+</svg>

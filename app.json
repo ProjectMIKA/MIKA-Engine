@@ -1,0 +1,8 @@
+{
+  "name": "MIKA Engine",
+  "version": "1.0.0",
+  "description": "Standalone Cyber-Familiar Desktop & Mobile Companion with Multi-Provider Local & Cloud LLM Uplink.",
+  "author": "Project MIKA",
+  "main": "index.html",
+  "icon": "icon.svg"
+}

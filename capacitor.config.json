@@ -1,0 +1,15 @@
+{
+  "appId": "com.projectmika.mikaengine",
+  "appName": "MIKA Engine",
+  "webDir": "dist",
+  "bundledWebRuntime": false,
+  "backgroundColor": "#050308",
+  "server": {
+    "androidScheme": "https",
+    "cleartext": true
+  },
+  "android": {
+    "allowMixedContent": true,
+    "backgroundColor": "#050308"
+  }
+}
